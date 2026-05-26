@@ -54,11 +54,14 @@ class Parser(BaseModel):
                         name = parts[1]
                         x = int(parts[2])
                         y = int(parts[3])
-                        options = {
-                                    option.strip('[]').split("=")[0]: option.strip('[]').split("=")[1]
-                                    for option in parts[4:]
-                                    if '=' in option
-                                }
+                        if parts[4].startswith('[') and parts[-1].endswith(']'):
+                            options = {
+                                        option.strip('[]').split("=")[0]: option.strip('[]').split("=")[1]
+                                        for option in parts[4:]
+                                        if '=' in option
+                                    }
+                        else:
+                            raise ValueError(f"Invalid options format in line: {line} - options should be enclosed in []")
                         if line.startswith("start_hub:"):
                             start_hub = {"name": name, "position": (x, y),
                                          "options": options}
@@ -91,30 +94,33 @@ class Parser(BaseModel):
 
 
 if __name__ == "__main__":
-    p = Parser.read_file("assets/maps/challenger/01_the_impossible_dream.txt")
-    if p:
-        print("nb_drones :", p.nb_drones)
+    try:
+        p = Parser.read_file("assets/maps/challenger/01_the_impossible_dream.txt")
+        if p:
+            print("nb_drones :", p.nb_drones)
 
-        print("=" * 50)
-        print("\noptions for start_hub:\n")
+            print("=" * 50)
+            print("\noptions for start_hub:\n")
 
-        for name, value in p.start_hub.items():
-            print(f"start_hub {name}: {value}")
-        print("=" * 50)
-        print("\noptions for hubs:\n")
-        for hub in p.hubs:
-            for name, value in hub.items():
-                print(f"hub {name}: {value}")
-            print()
-        print("=" * 50)
-        print("\noptions for end_hub:\n")
-        for name, value in p.end_hub.items():
-            print(f"end_hub {name}: {value}")
-        print("=" * 50)
-        print("\nconnections:")
-        for c in p.connections:
-            if len(c) == 3:
-                for name, value in c[2].items():
-                    print(f"connection: {c[0]} - {c[1]} option: {name}: {value}")
-            else:
-                print(f"connection: {c[0]} - {c[1]}")
+            for name, value in p.start_hub.items():
+                print(f"start_hub {name}: {value}")
+            print("=" * 50)
+            print("\noptions for hubs:\n")
+            for hub in p.hubs:
+                for name, value in hub.items():
+                    print(f"hub {name}: {value}")
+                print()
+            print("=" * 50)
+            print("\noptions for end_hub:\n")
+            for name, value in p.end_hub.items():
+                print(f"end_hub {name}: {value}")
+            print("=" * 50)
+            print("\nconnections:")
+            for c in p.connections:
+                if len(c) == 3:
+                    for name, value in c[2].items():
+                        print(f"connection: {c[0]} - {c[1]} option: {name}: {value}")
+                else:
+                    print(f"connection: {c[0]} - {c[1]}")
+    except Exception as e:
+        print(f"Error: {e}")
