@@ -172,7 +172,8 @@ connection: tunnelB-goal
 ### Colors
 
 - Colors are optional and can be used for visual representation.
-- Accepted values: any valid single-word string (e.g., `red`, `blue`, `gray`).
+- Accepted values: any valid
+ (e.g., `red`, `blue`, `gray`).
 - When specified, the implementation should provide visual feedback through colored terminal output or graphical representation.
 
 ### Connections
