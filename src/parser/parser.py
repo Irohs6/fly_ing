@@ -25,6 +25,13 @@ class Parser:
             file_path: Path to the map file to parse.
         """
         self.file_path = file_path
+        self.config = {
+            "start_hub": None,
+            "end_hub": None,
+            "hub": [],
+            "connection": [],
+            "nb_drones": None
+        }
 
     def parse(self) -> dict:
         """Parse the map file and return the structured config dict.
@@ -37,24 +44,17 @@ class Parser:
             ValueError: If the file format is invalid.
             IOError: If the file cannot be read.
         """
-        self.config = {
-            "start_hub": None,
-            "end_hub": None,
-            "hub": [],
-            "connection": [],
-        }
+
         try:
             lines = self._read_file()
-            nb_drones = self._parse_lines(lines)
+            self._parse_lines(lines)
             self._validate()
-            self.config["nb_drones"] = nb_drones
         except FileNotFoundError:
             raise FileNotFoundError(f"File not found: {self.file_path}")
         except ValueError as e:
             raise ValueError(f"Parse error: {e}") from e
         except IOError as e:
             raise IOError(f"Error reading file {self.file_path}: {e}") from e
-        return self.config
 
     def _read_file(self) -> list[tuple[int, str]]:
         """Read the file and return meaningful (line_number, content) pairs.
@@ -80,14 +80,14 @@ class Parser:
                 result.append((number_ligne, line))
         return result
 
-    def _parse_lines(self, lines: list[tuple[int, str]]) -> int:
+    def _parse_lines(self, lines: list[tuple[int, str]]) -> None:
         """Iterate meaningful lines and dispatch to hub/connection parsers.
 
         Args:
             lines: List of (line_number, line_content) pairs.
 
         Returns:
-            The value of nb_drones parsed from the file.
+            None
 
         Raises:
             ValueError: If a line has invalid format or content.
@@ -108,6 +108,7 @@ class Parser:
                         f"got: {raw!r}"
                     )
                 nb_drones = int(raw)
+                self.config["nb_drones"] = nb_drones
             elif (
                 line.startswith("start_hub:")
                 or line.startswith("hub:")
@@ -123,7 +124,7 @@ class Parser:
                 )
         if nb_drones is None:
             raise ValueError("Missing nb_drones definition")
-        return nb_drones
+        self.config["nb_drones"] = nb_drones
 
     def _validate(self) -> None:
         """Run all post-parse validation checks on self.config.
