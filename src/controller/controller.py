@@ -1,27 +1,23 @@
 from src.model.graph import Graph
-from src.view.view import View
-from src.model.simulation import Simulation
+from src.view.pygame_view import Pygame_view
 from src.parser.parser import Parser
 
 
 class Controller:
     def __init__(self, file_path: str) -> None:
-        config = Parser(file_path).parse()
-        self.graph = self.__create_graph()
-        self.simulation = self.__create_simulation()
-        self.view = self.__create_view()
-        self.graph.load_zones(config)
-        self.graph.load_connections(config)
-        self.simulation.load_drones(config["nb_drones"])
+        self.file_path = file_path
+        self.config = None
+        self.graph = Graph()
+        self.load_config()
+        self.view = Pygame_view(self.graph)
 
-    def __create_graph(self) -> Graph:
-        return Graph()
+    def load_config(self) -> None:
+        parser = Parser(self.file_path)
+        parser.parse()
+        self.config = parser.config
+        self.graph = Graph()
+        self.graph.load_zones(self.config)
+        self.graph.load_connections(self.config)
 
-    def __create_simulation(self) -> Simulation:
-        return Simulation(self.graph)
-
-    def __create_view(self) -> View:
-        return View(self.simulation)
-
-    def start_simulation(self) -> None:
-        self.simulation.start()
+    def display(self) -> None:
+        self.view.display()
