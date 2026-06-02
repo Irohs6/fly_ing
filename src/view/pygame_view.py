@@ -41,7 +41,7 @@ COLOR_MAP: dict[str, tuple[int, int, int]] = {
     "orange": (220, 140, 30),
     "purple": (160, 60, 200),
     "rainbow": (255, 100, 150),
-    "red": (220, 70, 60),
+    "red": (220, 70, 61),
     "violet": (130, 80, 220),
     "yellow": (220, 200, 30),
     "white": (200, 200, 200),
