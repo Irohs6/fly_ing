@@ -169,58 +169,6 @@ class HubRenderer:
         )
         screen.blit(cap_surf, cap_rect)
 
-    def _draw_turbine(
-        self,
-        screen: pygame.Surface,
-        color: tuple,
-        pos: tuple[int, int],
-        r: int,
-    ) -> None:
-        N_BLADES = 8
-        PERIOD_MS = 3000
-        # Facteur d'animation oscillant entre 0 et 1 selon le temps
-        anim_t = (
-            1 - math.cos(2 * math.pi * pygame.time.get_ticks() / PERIOD_MS)
-        ) / 2
-        # Le rayon intérieur pulse pour donner l'effet de rotation
-        inner_r = r * (0.08 + anim_t * 0.90)
-        angle_step = 2 * math.pi / N_BLADES
-        blade_span = angle_step * 0.98
-        twist = angle_step * 0.35
-        center_x, center_y = pos
-
-        # Fond sombre du disque de la turbine
-        pygame.draw.circle(screen, (20, 22, 32), pos, r)
-        for i in range(N_BLADES):
-            base = i * angle_step
-            # Angles des bords extérieurs et intérieurs de chaque pale
-            outer_angle_start = base - blade_span / 2
-            outer_angle_end = base + blade_span / 2
-            inner_angle_start = outer_angle_start + twist
-            inner_angle_end = outer_angle_end + twist
-            points = [
-                (
-                    center_x + r * math.cos(outer_angle_start),
-                    center_y + r * math.sin(outer_angle_start),
-                ),
-                (
-                    center_x + r * math.cos(outer_angle_end),
-                    center_y + r * math.sin(outer_angle_end),
-                ),
-                (
-                    center_x + inner_r * math.cos(inner_angle_end),
-                    center_y + inner_r * math.sin(inner_angle_end),
-                ),
-                (
-                    center_x + inner_r * math.cos(inner_angle_start),
-                    center_y + inner_r * math.sin(inner_angle_start),
-                ),
-            ]
-            pygame.draw.polygon(screen, color, points)
-        # Contour blanc du disque
-        pygame.draw.circle(screen, (255, 255, 255), pos, r, 2)
-
-
 # ── ConnectionRenderer
 
 

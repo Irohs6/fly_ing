@@ -72,6 +72,10 @@ EDGE CASES IMPORTANTS
   dans le calcul Manhattan
 """
 
+from typing import Callable
+
+HeuristicFunction = Callable[[str, str, dict], float]
+
 
 class Heuristic:
 
@@ -81,8 +85,8 @@ class Heuristic:
         target_info = node_meta.get(target_name)
         if not node_info or not target_info:
             return 0  # Dégradation gracieuse
-        x1, y1 = node_info.get("x", 0), node_info.get("y", 0)
-        x2, y2 = target_info.get("x", 0), target_info.get("y", 0)
+        x1, y1 = node_info.x, node_info.y
+        x2, y2 = target_info.x, target_info.y
         return abs(x1 - x2) + abs(y1 - y2)
 
     @staticmethod
@@ -91,8 +95,8 @@ class Heuristic:
         target_info = node_meta.get(target_name)
         if not node_info or not target_info:
             return 0  # Dégradation gracieuse
-        x1, y1 = node_info.get("x", 0), node_info.get("y", 0)
-        x2, y2 = target_info.get("x", 0), target_info.get("y", 0)
+        x1, y1 = node_info.x, node_info.y
+        x2, y2 = target_info.x, target_info.y
         return ((x1 - x2) ** 2 + (y1 - y2) ** 2) ** 0.5
 
     @staticmethod

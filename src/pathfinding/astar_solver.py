@@ -58,7 +58,9 @@ class AStarSolver:
 
                 tentative_g = g_score.get(
                     current, float("inf")
-                ) + self.cost_model.get_cost(current, neighbor)
+                ) + self.cost_model.compute_cost(
+                    current, neighbor, edge, self.adapter.node_meta
+                )
 
                 if tentative_g < g_score.get(neighbor, float("inf")):
                     came_from[neighbor] = current

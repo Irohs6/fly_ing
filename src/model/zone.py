@@ -17,5 +17,13 @@ class Zone:
     def zone_type(self) -> str:
         return self._zone_type if self._zone_type is not None else "normal"
 
+    def move_cost(self) -> int:
+        if self.zone_type == "restricted":
+            return 2
+        elif self.zone_type == "blocked":
+            return float("inf")
+        else:
+            return 1
+
     def __str__(self):
         return f"{self.name}"

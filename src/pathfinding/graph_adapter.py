@@ -54,3 +54,6 @@ class GraphAdapter:
                 x=zone.x,
                 y=zone.y,
             )
+
+    def get_neighbors(self, node: str) -> list:
+        return self.adjacency.get(node, [])

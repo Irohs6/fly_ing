@@ -157,4 +157,3 @@ class PathGenerator:
             seen.add(tuple(best_path))
 
         return results
-

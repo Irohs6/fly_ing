@@ -14,15 +14,23 @@ class Graph:
         )
         self.start_zone: Zone | None = None
         self.end_zone: Zone | None = None
+        self.adjacency: dict[str, list[Connection]] = {}
 
     def add_zone(self, zone: Zone) -> None:
         self.zones[zone.name] = zone
 
     def add_connection(
-        self, source: str, target: str, max_capacity: int = None
+        self,
+        source: str,
+        target: str,
+        max_capacity: int | None = None,
     ) -> None:
         connection = Connection(source, target, max_capacity)
+
         self.connections.append(connection)
+
+        self.adjacency.setdefault(source, []).append(connection)
+        self.adjacency.setdefault(target, []).append(connection)
 
     def load_zones(self, config: dict) -> None:
         start_hub_data = config["start_hub"]
@@ -64,8 +72,41 @@ class Graph:
             max_capacity = metadata.get("max_link_capacity")
             self.add_connection(source, target, max_capacity)
 
+    def get_neighbors(self, zone_name: str) -> list[Connection]:
+        return self.adjacency.get(zone_name, [])
+
     def __str__(self):
         result = "Graph:\n"
         for connection in self.connections:
             result += f"{connection}\n"
         return result
+
+
+if __name__ == "__main__":
+    graph = Graph()
+    graph.load_zones({
+        "start_hub": {
+            "name": "A",
+            "coordinate": [0, 0],
+            "metadata": {"color": "red", "zone": "normal", "max_drones": 2},
+        },
+        "end_hub": {
+            "name": "B",
+            "coordinate": [1, 1],
+            "metadata": {"color": "blue", "zone": "restricted", "max_drones": 3},
+        },
+        "hub": [
+            {
+                "name": "C",
+                "coordinate": [0, 1],
+                "metadata": {"color": "green", "zone": "blocked"},
+            }
+        ],
+    })
+    graph.load_connections({
+        "connection": [
+            ["A", "C", {"max_link_capacity": 2}],
+            ["C", "B", {"max_link_capacity": 3}],
+        ]
+    })
+    print(graph)

@@ -33,8 +33,8 @@ class CostModel:
     ) -> float:
 
         # Étape 1 : Coût de base lié au type de la zone cible
-        target_meta = node_meta.get(target_name, {})
-        zone_type = target_meta.get("zone_type", "normal")
+        target_meta = node_meta.get(target_name)
+        zone_type = target_meta.zone_type if target_meta else "normal"
         base_cost = self.ZONE_COST.get(zone_type, 1)
 
         # Si la zone est bloquée, retourner infini immédiatement
