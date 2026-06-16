@@ -9,8 +9,12 @@ def main() -> None:
 
     map_path = sys.argv[1]
 
-    controller = Controller(map_path)
-    controller.display()
+    try:
+        controller = Controller(map_path)
+        controller.display()
+    except (ValueError, FileNotFoundError, IOError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
 
 
 if __name__ == "__main__":

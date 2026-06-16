@@ -55,6 +55,7 @@ class Parser:
             raise ValueError(f"Parse error: {e}") from e
         except IOError as e:
             raise IOError(f"Error reading file {self.file_path}: {e}") from e
+        return self.config
 
     def _read_file(self) -> list[tuple[int, str]]:
         """Read the file and return meaningful (line_number, content) pairs.
@@ -137,6 +138,11 @@ class Parser:
         self._check_duplicate_hub_names()
         self._check_duplicate_connections()
         self._check_name_connections()
+        if not self._valid_path():
+            raise ValueError(
+                "No valid path exists between start_hub and end_hub"
+                " considering blocked zones"
+            )
 
     def _parse_hub_line(self, line: str, number_ligne: int) -> None:
         """Parse a hub line and add the zone to self.config.
@@ -325,15 +331,52 @@ class Parser:
                     f"Connection references undefined zone: {hub2!r}"
                 )
 
+    def _valid_path(self) -> bool:
+
+        blocked_zones = {
+            hub["name"]
+            for hub in self.config["hub"]
+            if hub["metadata"].get("zone") == "blocked"
+        }
+        start = self.config["start_hub"]["name"]
+        end = self.config["end_hub"]["name"]
+
+        stack: list[str] = [start]
+
+        visited: set[str] = set()
+
+        adjacency = {hub["name"]: [] for hub in self.config["hub"] if hub[
+            "name"] not in blocked_zones}
+
+        adjacency[start] = []
+        adjacency[end] = []
+
+        for hub1, hub2, _ in self.config["connection"]:
+            if hub1 not in blocked_zones and hub2 not in blocked_zones:
+                adjacency[hub1].append(hub2)
+                adjacency[hub2].append(hub1)
+
+        while stack:
+            current = stack.pop()
+            if current == end:
+                return True
+            if current not in visited:
+                visited.add(current)
+                for neighbor in adjacency[current]:
+                    if neighbor not in visited:
+                        stack.append(neighbor)
+        return False
+
 
 if __name__ == "__main__":
     import sys
+    import os
 
-    path = (
-        sys.argv[1]
-        if len(sys.argv) > 1
-        else "assets/maps/challenger/01_the_impossible_dream.txt"
+    _default = os.path.join(
+        os.path.dirname(__file__),
+        "../../assets/maps/challenger/01_the_impossible_dream.txt"
     )
+    path = sys.argv[1] if len(sys.argv) > 1 else _default
     try:
         p = Parser(path)
         config = p.parse()
