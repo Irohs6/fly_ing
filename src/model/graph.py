@@ -25,7 +25,12 @@ class Graph:
         target: str,
         max_capacity: int | None = None,
     ) -> None:
-        connection = Connection(source, target, max_capacity)
+        source_zone = self.zones.get(source)
+        target_zone = self.zones.get(target)
+        if source_zone is None or target_zone is None:
+            raise ValueError("Source or target zone not found")
+
+        connection = Connection(source_zone, target_zone, max_capacity)
 
         self.connections.append(connection)
 

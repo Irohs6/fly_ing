@@ -1,7 +1,10 @@
+from .zone import Zone
+
+
 class Connection:
     __slots__ = ["source", "target", "_max_capacity"]
 
-    def __init__(self, source: str, target: str, capacity: int = None):
+    def __init__(self, source: Zone, target: Zone, capacity: int = None):
         self.source = source
         self.target = target
         self._max_capacity = capacity
