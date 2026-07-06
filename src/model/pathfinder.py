@@ -6,7 +6,7 @@ class Djikstra:
     def __init__(self, graph: Graph):
         self.graph = graph
 
-    def shortest_distances(self, source: str):
+    def shortest_distances(self, source: str) -> tuple[dict[str, float], dict[str, str]]:
         """
         Retourne :
             distances : dict {noeud: distance_min}

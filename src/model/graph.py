@@ -98,7 +98,8 @@ if __name__ == "__main__":
         "end_hub": {
             "name": "B",
             "coordinate": [1, 1],
-            "metadata": {"color": "blue", "zone": "restricted", "max_drones": 3},
+            "metadata": {"color": "blue", "zone": "restricted",
+                         "max_drones": 3},
         },
         "hub": [
             {

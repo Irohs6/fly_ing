@@ -146,28 +146,25 @@ class HubRenderer:
         color = COLOR_MAP.get(zone.color, (200, 200, 200))
         hub_r = self.radius(zone, zoom)
 
-        # Les hubs start/end sont représentés par une turbine animée
+        pygame.draw.circle(screen, color, pos, hub_r)
         if is_start or is_end:
-            self._draw_turbine(screen, color, pos, hub_r)
+            # Bordure épaisse dorée pour distinguer les hubs de départ/arrivée
+            pygame.draw.circle(screen, (255, 215, 0), pos, hub_r, 3)
         else:
-            pygame.draw.circle(screen, color, pos, hub_r)
             pygame.draw.circle(screen, (255, 255, 255), pos, hub_r, 2)
 
         # Nom du hub affiché au-dessus
         name_surf = self.font_small.render(zone.name, True, TEXT_COLOR)
-        name_rect = name_surf.get_rect(
-            center=(pos[0], pos[1] - hub_r - 11)
-        )
+        name_rect = name_surf.get_rect(center=(pos[0], pos[1] - hub_r - 11))
         screen.blit(name_surf, name_rect)
 
         # Capacité affichée en dessous (0/max — simulation non démarrée)
         cap_surf = self.font.render(
             f"0/{zone.max_drones}", True, (255, 255, 255)
         )
-        cap_rect = cap_surf.get_rect(
-            center=(pos[0], pos[1] + hub_r + 20)
-        )
+        cap_rect = cap_surf.get_rect(center=(pos[0], pos[1] + hub_r + 20))
         screen.blit(cap_surf, cap_rect)
+
 
 # ── ConnectionRenderer
 
@@ -264,7 +261,7 @@ class GraphRenderer:
 
     def _compute_layout(self) -> None:
         """Calcule les coordonnées monde de chaque hub,
-             centrées sur l'origine."""
+        centrées sur l'origine."""
         zones = list(self.graph.zones.values())
         if not zones:
             return
@@ -290,8 +287,8 @@ class GraphRenderer:
 
         # Connexions dessinées en premier (sous les hubs)
         for conn in self.graph.connections:
-            pos_source = positions.get(conn.source)
-            pos_target = positions.get(conn.target)
+            pos_source = positions.get(conn.source.name)
+            pos_target = positions.get(conn.target.name)
             if pos_source and pos_target:
                 self.connection_renderer.draw(
                     self.screen, conn, pos_source, pos_target, camera.zoom
@@ -339,9 +336,9 @@ class Pygame_view:
                 if event.type == QUIT:
                     running = False
                 elif event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:      # Quitter
+                    if event.key == K_ESCAPE:  # Quitter
                         running = False
-                    elif event.key == K_r:          # Réinitialiser la caméra
+                    elif event.key == K_r:  # Réinitialiser la caméra
                         camera.reset()
                 else:
                     # Déléguer zoom et pan à la caméra

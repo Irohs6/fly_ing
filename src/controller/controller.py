@@ -1,6 +1,7 @@
 from src.model.graph import Graph
 from src.view.pygame_view import Pygame_view
 from src.parser.parser import Parser
+from src.model.simulation import Simulation
 
 
 class Controller:
@@ -18,6 +19,9 @@ class Controller:
         self.graph = Graph()
         self.graph.load_zones(self.config)
         self.graph.load_connections(self.config)
+        simulation = Simulation(self.graph, debug=False)
+        simulation.load_drones(self.config["nb_drones"])
+        simulation.simulate()
 
     def display(self) -> None:
         self.view.display()
