@@ -80,6 +80,12 @@ class Graph:
     def get_neighbors(self, zone_name: str) -> list[Connection]:
         return self.adjacency.get(zone_name, [])
 
+    def get_connection(self, source: str, target: str) -> "Connection | None":
+        for conn in self.adjacency.get(source, []):
+            if conn.source.name == target or conn.target.name == target:
+                return conn
+        return None
+
     def __str__(self):
         result = "Graph:\n"
         for connection in self.connections:

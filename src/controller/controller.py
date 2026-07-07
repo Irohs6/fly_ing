@@ -19,7 +19,7 @@ class Controller:
         self.graph = Graph()
         self.graph.load_zones(self.config)
         self.graph.load_connections(self.config)
-        simulation = Simulation(self.graph, debug=False)
+        simulation = Simulation(self.graph, debug=True)
         simulation.load_drones(self.config["nb_drones"])
         simulation.simulate()
 
