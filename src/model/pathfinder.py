@@ -6,7 +6,7 @@ class Djikstra:
     def __init__(self, graph: Graph):
         self.graph = graph
 
-    def shortest_distances(self, source: str, blocked_zone: str | None = None) -> tuple[dict[str, float], dict[str, str]]:
+    def shortest_distances(self, source: str, blocked_zones: set[str] | None = None, saturated_conns: set[int] | None = None) -> tuple[dict[str, float], dict[str, str]]:
         """
         Retourne :
             distances : dict {noeud: distance_min}
@@ -37,7 +37,9 @@ class Djikstra:
                 else:
                     neighbor = connection.source.name
                     neighbor_zone = connection.source
-                if neighbor == blocked_zone:
+                if blocked_zones and neighbor in blocked_zones:
+                    continue
+                if saturated_conns and id(connection) in saturated_conns:
                     continue
                 weight = neighbor_zone.move_cost()
                 new_distance = current_distance + weight
@@ -49,14 +51,14 @@ class Djikstra:
 
         return distances, predecessors
 
-    def shortest_path(self, source: str | None = None, blocked_zone: str | None = None) -> list[str] | None:
+    def shortest_path(self, source: str | None = None, blocked_zones: set[str] | None = None, saturated_conns: set[int] | None = None) -> list:
         """
-        Retourne la liste des noeuds du plus court chemin.
+        Retourne la liste des zones du plus court chemin.
         """
 
         source = source or self.graph.start_zone.name
         target = self.graph.end_zone.name
-        distances, predecessors = self.shortest_distances(source, blocked_zone)
+        distances, predecessors = self.shortest_distances(source, blocked_zones, saturated_conns)
 
         if distances[target] == float("inf"):
             return None
@@ -70,7 +72,7 @@ class Djikstra:
 
         path.reverse()
 
-        return path
+        return [self.graph.zones[name] for name in path]
 
     def distance_to(self, source: str, target: str):
         """

@@ -9,7 +9,7 @@ class Drone:
     ) -> None:
         self.drone_id = drone_id
         self.current_zone = current_zone
-        self.path: list[str] = []
+        self.path: list[Zone] = []
         self.status: str = "waiting"
         self.transit_turns: int = 0
         self.entry_connection: Connection | None = None

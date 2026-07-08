@@ -5,8 +5,9 @@ from src.model.simulation import Simulation
 
 
 class Controller:
-    def __init__(self, file_path: str) -> None:
+    def __init__(self, file_path: str, debug: bool = False) -> None:
         self.file_path = file_path
+        self.debug = debug
         self.config = None
         self.graph = Graph()
         self.load_config()
@@ -19,7 +20,7 @@ class Controller:
         self.graph = Graph()
         self.graph.load_zones(self.config)
         self.graph.load_connections(self.config)
-        simulation = Simulation(self.graph, debug=True)
+        simulation = Simulation(self.graph, debug=self.debug)
         simulation.load_drones(self.config["nb_drones"])
         simulation.simulate()
 

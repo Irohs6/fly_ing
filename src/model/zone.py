@@ -2,9 +2,15 @@ from __future__ import annotations
 
 
 class Zone:
-    def __init__(self, name: str, color: str = "white",
-                 zone_type: str = None, max_drones: int = None,
-                 x: int = 0, y: int = 0):
+    def __init__(
+        self,
+        name: str,
+        color: str = "white",
+        zone_type: str = None,
+        max_drones: int = None,
+        x: int = 0,
+        y: int = 0,
+    ):
         self.name = name
         self.color = color
         self._zone_type = zone_type
@@ -40,4 +46,7 @@ class Zone:
             return 1
 
     def __str__(self):
+        return f"{self.name}"
+
+    def __repr__(self):
         return f"{self.name}"

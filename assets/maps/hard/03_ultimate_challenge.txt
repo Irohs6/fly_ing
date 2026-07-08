@@ -48,7 +48,7 @@ end_hub: goal 13 0 [color=gold]
 
 # Layer 1 connections
 connection: start-dist_gate1
-connection: start-dist_gate2 [max_link_capacity=2]
+connection: start-dist_gate2 [max_link_capacity=3]
 connection: start-dist_gate3
 
 # Layer 2 connections - maze with traps
