@@ -229,7 +229,9 @@ class Parser:
                             f"Line {number_ligne}: invalid zone type {value!r}"
                         )
                     if key == "max_drones":
-                        if not value.isdigit() or int(value) < 1:
+                        if hub_type in ("start_hub", "end_hub"):
+                            metadata["max_drones"] = self.config["nb_drones"]
+                        elif not value.isdigit() or int(value) < 1:
                             raise ValueError(
                                 f"Line {number_ligne}: "
                                 f"{key} must be a positive integer"

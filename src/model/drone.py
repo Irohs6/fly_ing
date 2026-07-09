@@ -10,9 +10,9 @@ class Drone:
         self.drone_id = drone_id
         self.current_zone = current_zone
         self.path: list[Zone] = []
-        self.status: str = "waiting"
+        self.status: str = ""
         self.transit_turns: int = 0
-        self.entry_connection: Connection | None = None
+        self.moving_connection: tuple[bool, Connection | None] = (False, None)
 
     def __str__(self):
         return self.drone_id
@@ -22,10 +22,5 @@ class Drone:
     ) -> None:
         if self.current_zone is not None:
             self.current_zone.nb_drones -= 1
-        if self.entry_connection is not None:
-            self.entry_connection.nb_drones -= 1
         self.current_zone = zone
         zone.nb_drones += 1
-        self.entry_connection = connection
-        if connection is not None:
-            connection.nb_drones += 1

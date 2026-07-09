@@ -35,7 +35,6 @@ CONN_FILL = (55, 60, 78)
 CONN_BORDER = (40, 45, 60)
 
 BAND_WIDTH: int = 9
-BAND_GAP: int = 3
 
 HUB_BASE_RADIUS: int = 20
 HUB_SCALE: int = 3  # extra px per max_drone unit
@@ -182,63 +181,21 @@ class ConnectionRenderer:
         zoom: float = 1.0,
     ) -> None:
         capacity = connection.max_capacity
-        # Vecteur directeur de la connexion
-        delta_x = pos2[0] - pos1[0]
-        delta_y = pos2[1] - pos1[1]
-        length = math.hypot(delta_x, delta_y)
-        if length == 0:
+        if math.hypot(pos2[0] - pos1[0], pos2[1] - pos1[1]) == 0:
             return
 
-        # Largeur et espacement des bandes mis à l'échelle selon le zoom
-        band_w = max(2.0, BAND_WIDTH * zoom)
-        band_gap = max(1.0, BAND_GAP * zoom)
+        # Trait unique, épaisseur mise à l'échelle selon le zoom
+        line_w = max(2, int(BAND_WIDTH * zoom))
+        pygame.draw.line(screen, CONN_FILL, pos1, pos2, line_w)
+        pygame.draw.line(screen, CONN_BORDER, pos1, pos2, max(1, line_w - 2))
 
-        # Vecteur perpendiculaire normalisé (pour décaler les bandes)
-        perp_x = -delta_y / length
-        perp_y = delta_x / length
-
-        # Dessiner une bande par unité de capacité
-        for i in range(capacity):
-            # Décalage latéral pour centrer les bandes
-            offset = (i - (capacity - 1) / 2) * (band_w + band_gap)
-            band_offset_x = perp_x * offset
-            band_offset_y = perp_y * offset
-            # Demi-largeur pour construire les 4 coins du rectangle
-            half_x = perp_x * band_w / 2
-            half_y = perp_y * band_w / 2
-            corners = [
-                (
-                    pos1[0] + band_offset_x + half_x,
-                    pos1[1] + band_offset_y + half_y,
-                ),
-                (
-                    pos1[0] + band_offset_x - half_x,
-                    pos1[1] + band_offset_y - half_y,
-                ),
-                (
-                    pos2[0] + band_offset_x - half_x,
-                    pos2[1] + band_offset_y - half_y,
-                ),
-                (
-                    pos2[0] + band_offset_x + half_x,
-                    pos2[1] + band_offset_y + half_y,
-                ),
-            ]
-            pygame.draw.polygon(screen, CONN_FILL, corners)
-            pygame.draw.polygon(screen, CONN_BORDER, corners, 1)
-
-        # Afficher la capacité totale au milieu de la connexion
-        if capacity > 1:
-            mid = ((pos1[0] + pos2[0]) // 2, (pos1[1] + pos2[1]) // 2)
-            surf = self.font_small.render(
-                f"0/{capacity}", True, (120, 130, 150)
-            )
-            rect = surf.get_rect(center=mid)
-            # Fond sombre derrière le texte pour la lisibilité
-            pygame.draw.rect(
-                screen, BG_COLOR, rect.inflate(6, 4), border_radius=3
-            )
-            screen.blit(surf, rect)
+        # Capacité affichée au milieu de la connexion
+        mid = ((pos1[0] + pos2[0]) // 2, (pos1[1] + pos2[1]) // 2)
+        surf = self.font_small.render(f"0/{capacity}", True, (120, 130, 150))
+        rect = surf.get_rect(center=mid)
+        # Fond sombre derrière le texte pour la lisibilité
+        pygame.draw.rect(screen, BG_COLOR, rect.inflate(6, 4), border_radius=3)
+        screen.blit(surf, rect)
 
 
 # ── GraphRenderer
