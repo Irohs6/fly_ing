@@ -15,12 +15,18 @@ try:
         MOUSEBUTTONDOWN,
         MOUSEBUTTONUP,
         MOUSEMOTION,
+        K_SPACE,
+        K_LEFT,
+        K_RIGHT,
     )
 except ImportError:
     print(
         "Pygame is not installed. Please install it to run the visualization."
     )
     exit(1)
+
+from src.model.graph import Graph
+from src.view.drone_animator import DroneAnimationLayer
 
 
 # ── Constants
@@ -264,15 +270,15 @@ class GraphRenderer:
                     is_end=(zone == self.graph.end_zone),
                 )
 
-        pygame.display.flip()
-
 
 # ── Pygame_view (driver)
 
 
 class Pygame_view:
-    def __init__(self, graph: Graph) -> None:
+    def __init__(self, graph: Graph, simulation=None) -> None:
         self.graph = graph
+        self.simulation = simulation
+        self.animation_layer = None
 
     def display(self) -> None:
         pygame.init()
@@ -286,8 +292,18 @@ class Pygame_view:
         camera = Camera()
         renderer = GraphRenderer(self.graph, screen, font, font_small)
 
+        # Créer la couche d'animation des drones si la simulation est disponible
+        if self.simulation and self.simulation.tours:
+            hub_positions = self._extract_hub_positions()
+            self.animation_layer = DroneAnimationLayer(
+                hub_positions=hub_positions,
+                tours=self.simulation.tours,
+                auto_replay_speed=1.5,
+            )
+
         running = True
         while running:
+            dt = clock.tick(60) / 1000.0  # Temps en secondes
             screen_w, screen_h = screen.get_size()
             for event in pygame.event.get():
                 if event.type == QUIT:
@@ -300,7 +316,53 @@ class Pygame_view:
                 else:
                     # Déléguer zoom et pan à la caméra
                     camera.handle_event(event, screen_w, screen_h)
+                
+                # Traiter les événements de replay (SPACE, RIGHT, LEFT, R)
+                if self.animation_layer:
+                    self.animation_layer.handle_event(event)
+            
+            # Mise à jour de l'animation
+            if self.animation_layer:
+                self.animation_layer.update(dt)
+            
             renderer.draw(camera)
-            clock.tick(60)
+            
+            # Dessiner les drones animés
+            if self.animation_layer:
+                self.animation_layer.draw(
+                    surface=screen,
+                    camera=camera,
+                    screen_width=screen_w,
+                    screen_height=screen_h,
+                    zoom=camera.zoom,
+                )
+                self.animation_layer.draw_overlay(
+                    surface=screen,
+                    font=font_small,
+                    screen_width=screen_w,
+                    screen_height=screen_h,
+                )
+
+            pygame.display.flip()
 
         pygame.quit()
+
+    def _extract_hub_positions(self) -> dict:
+        """Extrait les positions des hubs à partir du graphe."""
+        # Utiliser les mêmes coordonnées que GraphRenderer._base
+        zones = list(self.graph.zones.values())
+        if not zones:
+            return {}
+        
+        # Centre géométrique de la grille pour centrer la carte à l'écran
+        center_x = (max(z.x for z in zones) + min(z.x for z in zones)) / 2
+        center_y = (max(z.y for z in zones) + min(z.y for z in zones)) / 2
+        
+        hub_positions = {}
+        for zone in zones:
+            # Appliquer la même transformation que GraphRenderer
+            hub_positions[zone.name] = (
+                (zone.x - center_x) * CELL_SIZE,
+                (zone.y - center_y) * CELL_SIZE,
+            )
+        return hub_positions

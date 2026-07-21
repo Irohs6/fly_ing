@@ -10,6 +10,7 @@ class Simulation:
         self.turn = 0
         self.debug = debug
         self.ph = Djikstra(graph)
+        self.tours: list[dict[str, str]] = []  # Historique des positions
 
     def add_drone(self, drone: Drone) -> None:
         # Ajoute un drone à la liste des drones de la simulation
@@ -26,31 +27,40 @@ class Simulation:
             drone.current_zone = start
             start.nb_drones += 1
             drone.path = list(path)[1:]
+        # Enregistrer l'état initial (tour 0)
+        self._record_tour()
 
     def _try_move(self, drone: Drone) -> str | None:
         # Tente de déplacer le drone vers sa prochaine zone.
         # Retourne la description du mouvement ou None si impossible.
-        next_zone = drone.path[0] if drone.path else None
-        if next_zone is None:
-            drone.status = "waiting"
-            return None
+        blocked_candidates: set[str] = set()
 
-        conn = self.graph.get_connection(
-            drone.current_zone.name, next_zone.name)
-        conn_ok = conn is None or conn.nb_drones < conn.max_capacity
-        zone_ok = next_zone.nb_drones < next_zone.max_drones
-        if zone_ok and conn_ok:
-            if next_zone.zone_type == "restricted":
+        while True:
+            next_zone = drone.path[0] if drone.path else None
+            if next_zone is None:
+                drone.status = "waiting"
+                return None
+
+            conn = self.graph.get_connection(
+                drone.current_zone.name, next_zone.name
+            )
+            conn_ok = conn is None or conn.nb_drones < conn.max_capacity
+            zone_ok = next_zone.nb_drones < next_zone.max_drones
+
+            if zone_ok and conn_ok:
+                if next_zone.zone_type == "restricted":
+                    drone.move_to_zone(next_zone, conn)
+                    drone.moving_connection = (True, conn)
+                    if conn:
+                        conn.add_nb_drone()
+                    drone.path.pop(0)
+                    drone.transit_turns = 0
+                    drone.status = "in_transit"
+                    return f"{drone.drone_id}-{next_zone.name}(transit)"
+
                 drone.move_to_zone(next_zone, conn)
-                drone.moving_connection = (True, conn)
-                conn.add_nb_drone()
-                drone.path.pop(0)
-                drone.transit_turns = 0
-                drone.status = "in_transit"
-                return f"{drone.drone_id}-{next_zone.name}(transit)"
-            else:
-                drone.move_to_zone(next_zone, conn)
-                conn.add_nb_drone() if conn else None
+                if conn:
+                    conn.add_nb_drone()
                 drone.path.pop(0)
                 drone.moving_connection = (True, conn)
                 drone.status = "moving"
@@ -58,20 +68,20 @@ class Simulation:
                     drone.status = "finished"
                     drone.current_zone.nb_drones -= 1
                 return f"{drone.drone_id}-{next_zone.name}"
-        elif next_zone.zone_type != "priority":
-            pf = self.ph
 
-            new_path = pf.shortest_path(
+            if next_zone.zone_type == "priority":
+                drone.status = "waiting"
+                return None
+
+            blocked_candidates.add(next_zone.name)
+            new_path = self.ph.shortest_path(
                 source=drone.current_zone.name,
-                blocked_zones={next_zone.name},
+                blocked_zones=blocked_candidates,
             )
-
-            if new_path:
-                drone.path = new_path[1:]
-                return self._try_move(drone)
-
-            drone.status = "waiting"
-            return None
+            if not new_path or len(new_path) <= 1:
+                drone.status = "waiting"
+                return None
+            drone.path = new_path[1:]
 
     def advance_transit(self) -> None:
         for drone in self.drones:
@@ -123,6 +133,17 @@ class Simulation:
                     print("Waiting:", ", ".join(waiting))
             else:
                 print(f"Turn {self.turn:>3}: " + " ".join(movements))
+            
+            # Enregistrer l'état du tour
+            self._record_tour()
+
+    def _record_tour(self) -> None:
+        """Enregistre la position de chaque drone pour le tour courant."""
+        tour_data = {}
+        for drone in self.drones:
+            if drone.current_zone:
+                tour_data[drone.drone_id] = drone.current_zone.name
+        self.tours.append(tour_data)
 
     def stop(self) -> None:
         # Point d'arrêt de la simulation (extensible pour un nettoyage futur)

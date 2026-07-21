@@ -49,6 +49,8 @@ class Parser:
             "connection": [],
             "nb_drones": None,
         }
+        # Numéros de ligne source pour chaque connexion (même index que config["connection"])
+        self._connection_line_numbers: list[int] = []
 
     def parse(self) -> dict:
         """Parse the map file and return the structured config dict.
@@ -315,6 +317,7 @@ class Parser:
                     f"{metadata_part!r}"
                 )
         self.config["connection"].append((hub1, hub2, metadata))
+        self._connection_line_numbers.append(number_ligne)
 
     def _check_duplicate_hub_names(self) -> None:
         """Check that all zone names are unique across hubs.
@@ -362,13 +365,17 @@ class Parser:
         known_names.add(self.config["end_hub"]["name"])
         for hub in self.config["hub"]:
             known_names.add(hub["name"])
-        for hub1, hub2, _ in self.config["connection"]:
+        for (hub1, hub2, _), line_number in zip(
+            self.config["connection"], self._connection_line_numbers
+        ):
             if hub1 not in known_names:
                 raise ValueError(
+                    f"Line {line_number}: "
                     f"Connection references undefined zone: {hub1!r}"
                 )
             if hub2 not in known_names:
                 raise ValueError(
+                    f"Line {line_number}: "
                     f"Connection references undefined zone: {hub2!r}"
                 )
 
