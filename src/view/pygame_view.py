@@ -1,6 +1,7 @@
 import math
 import os
 from src.model.graph import Graph
+from src.view.drone_animator import DroneAnimationLayer
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
@@ -24,10 +25,6 @@ except ImportError:
         "Pygame is not installed. Please install it to run the visualization."
     )
     exit(1)
-
-from src.model.graph import Graph
-from src.view.drone_animator import DroneAnimationLayer
-
 
 # ── Constants
 
@@ -292,7 +289,8 @@ class Pygame_view:
         camera = Camera()
         renderer = GraphRenderer(self.graph, screen, font, font_small)
 
-        # Créer la couche d'animation des drones si la simulation est disponible
+        # Créer la couche d'animation des drones si la simulation
+        # est disponible
         if self.simulation and self.simulation.tours:
             hub_positions = self._extract_hub_positions()
             self.animation_layer = DroneAnimationLayer(
@@ -316,17 +314,17 @@ class Pygame_view:
                 else:
                     # Déléguer zoom et pan à la caméra
                     camera.handle_event(event, screen_w, screen_h)
-                
+
                 # Traiter les événements de replay (SPACE, RIGHT, LEFT, R)
                 if self.animation_layer:
                     self.animation_layer.handle_event(event)
-            
+
             # Mise à jour de l'animation
             if self.animation_layer:
                 self.animation_layer.update(dt)
-            
+
             renderer.draw(camera)
-            
+
             # Dessiner les drones animés
             if self.animation_layer:
                 self.animation_layer.draw(
@@ -353,11 +351,11 @@ class Pygame_view:
         zones = list(self.graph.zones.values())
         if not zones:
             return {}
-        
+
         # Centre géométrique de la grille pour centrer la carte à l'écran
         center_x = (max(z.x for z in zones) + min(z.x for z in zones)) / 2
         center_y = (max(z.y for z in zones) + min(z.y for z in zones)) / 2
-        
+
         hub_positions = {}
         for zone in zones:
             # Appliquer la même transformation que GraphRenderer

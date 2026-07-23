@@ -13,7 +13,7 @@
 
 Le projet est architecturé en MVC :
 - **Parser** : lit un fichier `.txt` au format spécifique et produit un dictionnaire de configuration.
-- **Model** : `Graph`, `Zone`, `Connection`, `Drone`, `Simulation` + un `Djikstra` (sic) intégré.
+- **Model** : `Graph`, `Zone`, `Connection`, `Drone`, `Simulation` + un `Dijktra` (sic) intégré.
 - **Pathfinding** : module séparé avec A\*, `CostModel`, `Heuristic`, `GraphAdapter`, `PathGenerator`, `RouteManager`.
 - **View** : visualisation Pygame (zoom, pan, hubs, connexions) + `terminal.py` (vide).
 - **Controller** : orchestre le tout.
@@ -219,7 +219,7 @@ fly_ing/
 - `shortest_path()` retourne une liste de `Zone` objects — propre.
 
 **Problèmes :**
-- **Typo dans le nom de classe** : `Djikstra` au lieu de `Dijkstra` — cité dans `simulation.py` et partout.
+- **Typo dans le nom de classe** : `Dijktra` au lieu de `Dijkstra` — cité dans `simulation.py` et partout.
 - Bloc `__main__` volumineux (40 lignes) dans le fichier de production.
 - `blocked_zones` et `saturated_conns` sont acceptés en paramètre mais **jamais passés** par la Simulation.
 - La distance Manhattan n'est pas utilisée comme heuristique (ce serait A\*, non Dijkstra).
@@ -245,7 +245,7 @@ C'est le fichier le plus problématique du projet.
 
 **Points corrects (précisions) :**
 
-- **Dijkstra dynamique intentionnel** : le `Djikstra` n'est instancié dans `_try_move` que lorsqu'un drone est **bloqué** (pas à chaque tour, pas pour chaque drone). C'est un mécanisme de re-routing réactif délibéré — acceptable.
+- **Dijkstra dynamique intentionnel** : le `Dijktra` n'est instancié dans `_try_move` que lorsqu'un drone est **bloqué** (pas à chaque tour, pas pour chaque drone). C'est un mécanisme de re-routing réactif délibéré — acceptable.
 
 - **Zones `restricted` fonctionnelles** : `move_to_zone(next_zone, conn)` place le drone dans la zone avec connexion trackée, `status=in_transit`, `transit_turns=0`. `advance_transit()` incrémente jusqu'à `>= move_cost()` (=2). Mécanisme qui fonctionne. À noter : le drone passe 2 tours supplémentaires après l'entrée (transit_turns 0→1→2), ce qui donne 3 tours effectifs au lieu de 2 — décalage d'un tour par rapport au sujet, mais le mécanisme est bien présent.
 
@@ -316,7 +316,7 @@ Le fichier est incomplet.
 
 - **Variables** : globalement clair (`nb_drones`, `max_drones`, `best_nbr`, `band_gap`). Quelques exceptions : `pf` (trop court), `nc` (ambigu pour une connexion), `c` dans la boucle de validation.
 - **Méthodes** : bien nommées pour le parser (`_parse_hub_line`, `_validate`, `_check_duplicate_connections`). Moins bien dans la simulation (`_try_move` fait trop de choses).
-- **Classes** : `Djikstra` (typo), `Pygame_view` (convention incorrecte).
+- **Classes** : `Dijktra` (typo), `Pygame_view` (convention incorrecte).
 - **Packages** : cohérents (`model`, `parser`, `pathfinding`, `view`, `controller`).
 
 ### Cohérence
@@ -372,7 +372,7 @@ Aucun héritage dans le projet. LSP n'est ni respecté ni violé (pas applicable
 
 Pas d'interfaces formelles (pas de classe abstraite `ABC`). `HeuristicFunction = Callable[[str, str, dict], float]` est une interface implicite légère. Les composants A\* n'exigent que ce dont ils ont besoin.
 
-Manque : une interface `IPathfinder` pour uniformiser `Djikstra` et `AStarSolver` permettrait de les échanger sans modifier `Simulation`.
+Manque : une interface `IPathfinder` pour uniformiser `Dijktra` et `AStarSolver` permettrait de les échanger sans modifier `Simulation`.
 
 **Note I : 6 / 10**
 
@@ -382,7 +382,7 @@ Manque : une interface `IPathfinder` pour uniformiser `Djikstra` et `AStarSolver
 
 - `AStarSolver` dépend de `GraphAdapter`, `CostModel`, `HeuristicFunction` — **injectés** → DIP respecté.
 - `RouteManager` crée lui-même ses dépendances dans `prepare()` — DIP partiellement violé.
-- `Simulation` instancie `Djikstra(self.graph)` directement à chaque appel — DIP violé.
+- `Simulation` instancie `Dijktra(self.graph)` directement à chaque appel — DIP violé.
 - `Controller` instancie directement `Parser`, `Graph`, `Simulation`, `Pygame_view` — DIP violé.
 
 **Note D : 4 / 10**
@@ -423,7 +423,7 @@ Manque : une interface `IPathfinder` pour uniformiser `Djikstra` et `AStarSolver
 | Taille des classes | `Simulation` et `Parser` sont à la limite haute. Les autres classes sont compactes. | 🟡 |
 | Commentaires | Présents et utiles dans le parser, le pathfinding. Absents ou triviaux dans la simulation. | 🟡 |
 | Constantes | Bien gérées en haut de `pygame_view.py` et comme attributs de classe dans `Parser` et `CostModel`. | ✔️ |
-| Duplication | `Djikstra` est instancié dans chaque appel de `_try_move` — duplication logique. `nb_drones` est manipulé à deux endroits. | ❌ |
+| Duplication | `Dijktra` est instancié dans chaque appel de `_try_move` — duplication logique. `nb_drones` est manipulé à deux endroits. | ❌ |
 | Lisibilité | Globalement lisible. Quelques variables trop courtes (`pf`, `nc`, `d`). | 🟡 |
 | Indentation | Correcte, PEP 8. | ✔️ |
 | Abstraction | Le module `pathfinding` est bien abstrait. La simulation mélange les niveaux. | 🟡 |
@@ -443,7 +443,7 @@ Manque : une interface `IPathfinder` pour uniformiser `Djikstra` et `AStarSolver
 | `Simulation._try_move()` | `simulation.py` | ~60 lignes, instanciation Dijkstra en boucle, récursivité non bornée |
 | `Parser._parse_hub_line()` | `parser.py` | ~70 lignes, parsing + validation + affectation mélangés |
 | `Parser._valid_path()` | `parser.py` | DFS inline dans le parser — acceptable mais verbeux |
-| `Djikstra.shortest_distances()` | `pathfinder.py` | Correct algorithmiquement mais paramètres `blocked_zones`/`saturated_conns` jamais exploités |
+| `Dijktra.shortest_distances()` | `pathfinder.py` | Correct algorithmiquement mais paramètres `blocked_zones`/`saturated_conns` jamais exploités |
 
 ### Simplifications possibles
 
@@ -467,11 +467,11 @@ for _ in range(MAX_REROUTE_ATTEMPTS):
 ```python
 # Actuel — O(T × D × M) instanciations
 def _try_move(self, drone):
-    pf = Djikstra(self.graph)  # ← dans la boucle
+    pf = Dijktra(self.graph)  # ← dans la boucle
 
 # Mieux — pré-calculer une fois dans execute()
 def execute(self):
-    pf = Djikstra(self.graph)
+    pf = Dijktra(self.graph)
     while ...:
         for drone in self.drones:
             self._try_move(drone, pf)
@@ -485,7 +485,7 @@ def execute(self):
 
 | Couple | Type | Niveau |
 |---|---|---|
-| `Simulation` ↔ `Djikstra` | Instanciation directe dans la boucle | Fort (problématique) |
+| `Simulation` ↔ `Dijktra` | Instanciation directe dans la boucle | Fort (problématique) |
 | `Controller` ↔ `Simulation` | Instanciation directe | Moyen |
 | `AStarSolver` ↔ `GraphAdapter` | Injection | Faible (bon) |
 | `AStarSolver` ↔ `CostModel` | Injection | Faible (bon) |
@@ -673,7 +673,7 @@ test_simulation.py :
 
 - Type hints incomplets dans `simulation.py` et `route_manager.py`.
 - Commentaires en français dans un projet dont le code est en anglais.
-- `Djikstra` (typo) dans le nom de classe.
+- `Dijktra` (typo) dans le nom de classe.
 - `Pygame_view` en snake_case au lieu de PascalCase.
 - `terminal.py` vide alors que c'est un composant de la vue mentionné dans l'architecture.
 - Simulation lancée dans le constructeur du Controller.
@@ -746,7 +746,7 @@ start = Zone(
 | Implémenter l'animation Pygame (drones se déplacent frame par frame) | Vue statique insuffisante | Expérience utilisateur, critère bonus | Difficile |
 | Implémenter les tests `test_parser.py`, `test_graph.py`, `test_simulation.py` | Couverture 12% → > 60% | Fiabilité | Moyen |
 | Remplacer `_try_move` récursif par une boucle bornée | Sécurité | Robustesse sur graphes complexes | Facile |
-| Pré-instancier `Djikstra` une fois dans `execute()` | Performance | Réduction drastique des allocations | Facile |
+| Pré-instancier `Dijktra` une fois dans `execute()` | Performance | Réduction drastique des allocations | Facile |
 | Extraire l'affichage de `Simulation` vers `terminal.py` | SRP | Maintenabilité | Moyen |
 | Remplacer `drone.status: str` par `enum.Enum` | Robustesse | Typo-safe | Facile |
 | Corriger la gestion des zones `restricted` (drone en transit sur la connexion) | Correctness | Conformité au sujet | Moyen |
@@ -757,7 +757,7 @@ start = Zone(
 
 | Action | Pourquoi | Bénéfice | Difficulté |
 |---|---|---|---|
-| Renommer `Djikstra` → `Dijkstra` | Typo | Professionnalisme | Facile |
+| Renommer `Dijktra` → `Dijkstra` | Typo | Professionnalisme | Facile |
 | Renommer `Pygame_view` → `PygameView` | Convention Python | Cohérence | Facile |
 | Supprimer le code mort (`add_nb_drone`, `remove_nb_drone`, `zone_type.setter`) | Clean code | Réduction du bruit | Facile |
 | Supprimer les blocs `__main__` de `graph.py` et `pathfinder.py` | Clean code | Clarté | Facile |

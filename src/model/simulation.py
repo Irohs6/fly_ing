@@ -1,6 +1,6 @@
 from .drone import Drone
 from .graph import Graph
-from .pathfinder import Djikstra
+from .pathfinder import Dijktra
 
 
 class Simulation:
@@ -9,7 +9,7 @@ class Simulation:
         self.drones: list[Drone] = []
         self.turn = 0
         self.debug = debug
-        self.ph = Djikstra(graph)
+        self.ph = Dijktra(graph)
         self.tours: list[dict[str, str]] = []  # Historique des positions
 
     def add_drone(self, drone: Drone) -> None:
@@ -133,7 +133,7 @@ class Simulation:
                     print("Waiting:", ", ".join(waiting))
             else:
                 print(f"Turn {self.turn:>3}: " + " ".join(movements))
-            
+
             # Enregistrer l'état du tour
             self._record_tour()
 

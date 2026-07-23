@@ -7,7 +7,6 @@ Ce module gère:
 - Le rendu des drones sur la surface pygame
 """
 
-import math
 from enum import Enum
 from typing import Dict, List, Optional, Tuple
 
@@ -22,7 +21,6 @@ except ImportError:
 
 
 DRONE_RADIUS: int = 8
-DRONE_SPEED: float = 200.0  # pixels per second
 ANIMATION_DURATION: float = 1.0  # seconds to animate one turn transition
 
 # Couleurs pour les drones
@@ -35,7 +33,6 @@ DRONE_COLORS: Dict[str, Tuple[int, int, int]] = {
 
 class ReplayState(Enum):
     """État du contrôle de replay."""
-    STOPPED = 0
     PLAYING = 1
     PAUSED = 2
 
@@ -46,7 +43,7 @@ class ReplayState(Enum):
 class AnimatedDrone:
     """
     Représente un drone avec position interpolée pour l'animation.
-    
+
     Attributes:
         drone_id: Identifiant unique du drone
         hub_positions: Dict{hub_name: (x, y)} pour la localisation spatiale
@@ -85,7 +82,7 @@ class AnimatedDrone:
     def update(self, dt: float) -> None:
         """
         Met à jour la position du drone avec interpolation.
-        
+
         Args:
             dt: Temps écoulé depuis le dernier frame en secondes
         """
@@ -146,11 +143,6 @@ class AnimatedDrone:
 
         # Bordure
         pygame.draw.circle(surface, (255, 255, 255), (screen_x, screen_y), radius, 1)
-
-    def get_current_hub(self) -> str:
-        """Retourne le hub courant du drone."""
-        return self.end_hub if not self.is_moving else self.start_hub
-
 
 # ── ReplayController ─────────────────────────────────────────────────────────
 
@@ -271,13 +263,11 @@ class ReplayController:
 class DroneAnimationLayer:
     """
     Couche d'animation gérant l'ensemble des drones et leur rendu.
-    
     Gère:
     - Création et suppression des drones
     - Mise à jour des positions selon l'historique des tours
     - Rendu de tous les drones
     - Contrôle de replay
-    
     Attributes:
         drones: Dict de drones animés {drone_id: AnimatedDrone}
         hub_positions: Dict{hub_name: (x, y)} des positions des hubs
@@ -294,7 +284,7 @@ class DroneAnimationLayer:
     ) -> None:
         """
         Initialise la couche d'animation.
-        
+
         Args:
             hub_positions: Dict{hub_name: (x, y)} positions spatiales des hubs
             tours: Liste des tours [ {drone_id: hub_name}, ... ]
@@ -327,9 +317,9 @@ class DroneAnimationLayer:
     def _apply_turn(self, turn_index: int) -> None:
         """
         Applique un tour à tous les drones.
-        
+
         Déplace les drones et lance les animations si nécessaire.
-        
+
         Args:
             turn_index: Index du tour [0, len(tours)-1]
         """
@@ -357,27 +347,10 @@ class DroneAnimationLayer:
 
         self.last_tour_applied = turn_index
 
-    def add_drone(self, drone_id: str, initial_hub: str) -> None:
-        """
-        Ajoute un drone manuellement.
-        
-        Args:
-            drone_id: Identifiant du drone
-            initial_hub: Hub initial du drone
-        """
-        if drone_id not in self.drones:
-            self.drones[drone_id] = AnimatedDrone(
-                drone_id, self.hub_positions, initial_hub
-            )
-
-    def remove_drone(self, drone_id: str) -> None:
-        """Supprime un drone de l'animation."""
-        self.drones.pop(drone_id, None)
-
     def update(self, dt: float) -> None:
         """
         Met à jour l'état de l'animation et l'historique.
-        
+
         Args:
             dt: Temps écoulé depuis le dernier frame en secondes
         """

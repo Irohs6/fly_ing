@@ -9,22 +9,22 @@ class Controller:
         self.file_path = file_path
         self.debug = debug
         self.config = None
-        self.graph = Graph()
+        self.graph = None
         self.simulation = None
         self.load_config()
         self.view = Pygame_view(self.graph, simulation=self.simulation)
 
     def load_config(self) -> None:
         parser = Parser(self.file_path)
-        parser.parse()
-        self.config = parser.config
+        self.config = parser.parse()
         self.graph = Graph()
         self.graph.load_zones(self.config)
         self.graph.load_connections(self.config)
+        if not self.graph.valid_path():
+            raise ValueError("No valid path from start to end zone.")
         self.simulation = Simulation(self.graph, debug=self.debug)
         self.simulation.load_drones(self.config["nb_drones"])
         self.simulation.simulate()
 
     def display(self) -> None:
-        self.view = Pygame_view(self.graph, simulation=self.simulation)
         self.view.display()

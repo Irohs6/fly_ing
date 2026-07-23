@@ -1,6 +1,8 @@
 from .connection import Connection
 from .zone import Zone
 
+from collections import defaultdict
+
 
 class Graph:
     def __init__(
@@ -8,77 +10,59 @@ class Graph:
         zones: dict[str, Zone] = None,
         connections: list[Connection] = None,
     ):
-        self.zones: dict[str, Zone] = zones if zones is not None else {}
-        self.connections: list[Connection] = (
-            connections if connections is not None else []
-        )
+        self.zones: dict[str, Zone] = zones or {}
+        self.connections: list[Connection] = connections or []
         self.start_zone: Zone | None = None
         self.end_zone: Zone | None = None
-        self.adjacency: dict[str, list[Connection]] = {}
+        self.adjacency: dict[str, list[Connection]] = defaultdict(list)
 
     def add_zone(self, zone: Zone) -> None:
         self.zones[zone.name] = zone
 
-    def add_connection(
-        self,
-        source: str,
-        target: str,
-        max_capacity: int | None = None,
-    ) -> None:
-        source_zone = self.zones.get(source)
-        target_zone = self.zones.get(target)
-        if source_zone is None or target_zone is None:
-            raise ValueError("Source or target zone not found")
+    def add_connection(self, source: str, target: str,
+                       max_capacity: int | None = None) -> None:
+        try:
+            source_zone = self.zones[source]
+            target_zone = self.zones[target]
+        except KeyError as e:
+            raise ValueError(f"Unknown zone: {e.args[0]}")
 
         connection = Connection(source_zone, target_zone, max_capacity)
 
         self.connections.append(connection)
 
-        self.adjacency.setdefault(source, []).append(connection)
-        self.adjacency.setdefault(target, []).append(connection)
+        for node in (source, target):
+            self.adjacency[node].append(connection)
+
+    def _create_zone(self, data: dict[str, any]) -> Zone:
+        metadata = data.get("metadata", {})
+
+        return Zone(
+            name=data["name"],
+            color=metadata.get("color", "white"),
+            zone_type=metadata.get("zone", "normal"),
+            max_drones=metadata.get("max_drones", 1),
+            x=data["coordinate"][0],
+            y=data["coordinate"][1],
+        )
 
     def load_zones(self, config: dict) -> None:
-        start_hub_data = config["start_hub"]
-        end_hub_data = config["end_hub"]
-        start = Zone(
-            start_hub_data["name"],
-            color=start_hub_data.get("metadata", {}).get("color", "white"),
-            zone_type=start_hub_data.get("metadata", {}).get("zone"),
-            max_drones=start_hub_data.get("metadata", {}).get("max_drones"),
-            x=start_hub_data["coordinate"][0],
-            y=start_hub_data["coordinate"][1],
-        )
-        end = Zone(
-            end_hub_data["name"],
-            color=end_hub_data.get("metadata", {}).get("color", "white"),
-            zone_type=end_hub_data.get("metadata", {}).get("zone"),
-            max_drones=end_hub_data.get("metadata", {}).get("max_drones"),
-            x=end_hub_data["coordinate"][0],
-            y=end_hub_data["coordinate"][1],
-        )
-        self.start_zone = start
-        self.end_zone = end
-        self.add_zone(start)
-        self.add_zone(end)
-        for hub in config["hub"]:
-            self.add_zone(
-                Zone(
-                    hub["name"],
-                    color=hub.get("metadata", {}).get("color", "white"),
-                    zone_type=hub.get("metadata", {}).get("zone"),
-                    max_drones=hub.get("metadata", {}).get("max_drones"),
-                    x=hub["coordinate"][0],
-                    y=hub["coordinate"][1],
-                )
-            )
+        self.start_zone = self._create_zone(config["start_hub"])
+        self.end_zone = self._create_zone(config["end_hub"])
+
+        for zone in (self.start_zone, self.end_zone):
+            self.add_zone(zone)
+
+        for hub in config.get("hub", []):
+            self.add_zone(self._create_zone(hub))
 
     def load_connections(self, config: dict) -> None:
         for source, target, metadata in config["connection"]:
-            max_capacity = metadata.get("max_link_capacity")
-            self.add_connection(source, target, max_capacity)
+            self.add_connection(source, target,
+                                metadata.get("max_link_capacity"))
 
     def get_neighbors(self, zone_name: str) -> list[Connection]:
-        return self.adjacency.get(zone_name, [])
+        return self.adjacency[zone_name]
 
     def get_connection(self, source: str, target: str) -> "Connection | None":
         for conn in self.adjacency.get(source, []):
@@ -87,38 +71,46 @@ class Graph:
         return None
 
     def __str__(self):
-        result = "Graph:\n"
-        for connection in self.connections:
-            result += f"{connection}\n"
-        return result
+        return "Graph:\n" + "\n".join(map(str, self.connections))
 
+    def valid_path(self) -> bool:
+        # Collecte des zones bloquées (inaccessibles aux drones)
+        blocked_zones = {
+            zone.name
+            for zone in self.zones.values()
+            if zone.zone_type == "blocked"
+        }
+        start = self.start_zone.name
+        end = self.end_zone.name
 
-if __name__ == "__main__":
-    graph = Graph()
-    graph.load_zones({
-        "start_hub": {
-            "name": "A",
-            "coordinate": [0, 0],
-            "metadata": {"color": "red", "zone": "normal", "max_drones": 2},
-        },
-        "end_hub": {
-            "name": "B",
-            "coordinate": [1, 1],
-            "metadata": {"color": "blue", "zone": "restricted",
-                         "max_drones": 3},
-        },
-        "hub": [
-            {
-                "name": "C",
-                "coordinate": [0, 1],
-                "metadata": {"color": "green", "zone": "blocked"},
-            }
-        ],
-    })
-    graph.load_connections({
-        "connection": [
-            ["A", "C", {"max_link_capacity": 2}],
-            ["C", "B", {"max_link_capacity": 3}],
-        ]
-    })
-    print(graph)
+        # Parcours en profondeur (DFS) pour vérifier l'existence d'un chemin
+        stack: list[str] = [start]
+        visited: set[str] = set()
+
+        # Construction de la liste d'adjacence (hors zones bloquées)
+        adjacency = {
+            zone.name: []
+            for zone in self.zones.values()
+            if zone.name not in blocked_zones
+        }
+        adjacency[start] = []
+        adjacency[end] = []
+
+        for conn in self.connections:
+            hub1 = conn.source.name
+            hub2 = conn.target.name
+            # N'ajouter que les connexions entre hubs non bloqués
+            if hub1 not in blocked_zones and hub2 not in blocked_zones:
+                adjacency[hub1].append(hub2)
+                adjacency[hub2].append(hub1)
+
+        while stack:
+            current = stack.pop()
+            if current == end:
+                return True  # Chemin trouvé
+            if current not in visited:
+                visited.add(current)
+                for neighbor in adjacency[current]:
+                    if neighbor not in visited:
+                        stack.append(neighbor)
+        return False  # Aucun chemin possible

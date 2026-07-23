@@ -1,23 +1,4 @@
-# Easy Level 3: Basic capacity management
-# nb_drones: 4
 
-# start_hub: start 0 0 [color=green max_drones=4]
-# hub: bottleneck 1 0 [color=orange max_drones=2]
-# hub: wide_area 2 0 [color=blue max_drones=3]
-# end_hub: goal 3 0 [color=red max_drones=4]
-
-# connection: start-bottleneck [max_link_capacity=4]
-# connection: bottleneck-wide_area [max_link_capacity=4]
-# connection: wide_area-goal [max_link_capacity=4]
-
-
-# --- Parseur de fichiers de carte pour le routage de drones ---
-# Structure attendue du fichier :
-#   nb_drones: <entier positif>
-#   start_hub: <nom> <x> <y> [métadonnées optionnelles]
-#   hub: <nom> <x> <y> [métadonnées optionnelles]
-#   end_hub: <nom> <x> <y> [métadonnées optionnelles]
-#   connection: <hub1>-<hub2> [métadonnées optionnelles]
 class Parser:
     """Parses drone routing map files into a structured config dict."""
 
@@ -49,7 +30,8 @@ class Parser:
             "connection": [],
             "nb_drones": None,
         }
-        # Numéros de ligne source pour chaque connexion (même index que config["connection"])
+        # Numéros de ligne source pour chaque connexion
+        #  (même index que config["connection"])
         self._connection_line_numbers: list[int] = []
 
     def parse(self) -> dict:
@@ -65,7 +47,8 @@ class Parser:
         """
 
         try:
-            # Étape 1 : lecture du fichier (suppression des commentaires/lignes vides)
+            # Étape 1 : lecture du fichier
+            # (suppression des commentaires/lignes vides)
             lines = self._read_file()
             # Étape 2 : analyse ligne par ligne et remplissage de self.config
             self._parse_lines(lines)
@@ -171,12 +154,6 @@ class Parser:
         self._check_duplicate_connections()
         # Vérification que chaque connexion pointe vers des hubs existants
         self._check_name_connections()
-        # Vérification qu'un chemin existe entre départ et arrivée
-        if not self._valid_path():
-            raise ValueError(
-                "No valid path exists between start_hub and end_hub"
-                " considering blocked zones"
-            )
 
     def _parse_hub_line(self, line: str, number_ligne: int) -> None:
         """Parse a hub line and add the zone to self.config.
@@ -188,7 +165,8 @@ class Parser:
         Raises:
             ValueError: If the line format or metadata is invalid.
         """
-        # Exemple de ligne attendue : start_hub: depart 0 0 [color=green max_drones=4]
+        # Exemple de ligne attendue : start_hub: depart 0 0
+        # [color=green max_drones=4]
         # Décomposition : <type>: <nom> <x> <y> [clé=valeur ...]
         parts = line.split()
         if len(parts) < 4:
@@ -214,7 +192,8 @@ class Parser:
             )
         metadata: dict[str, str | int] = {}
         if len(parts) > 4:
-            # Reconstruction de la partie métadonnées (ex: [color=blue max_drones=3])
+            # Reconstruction de la partie métadonnées
+            # (ex: [color=blue max_drones=3])
             metadata_part = " ".join(parts[4:])
             if metadata_part.startswith("[") and metadata_part.endswith("]"):
                 metadata_part = metadata_part[1:-1]  # Suppression des crochets
@@ -272,7 +251,8 @@ class Parser:
         Raises:
             ValueError: If the line format or metadata is invalid.
         """
-        # Exemple de ligne attendue : connection: depart-arrivee [max_link_capacity=4]
+        # Exemple de ligne attendue : connection: depart-arrivee
+        # [max_link_capacity=4]
         # Décomposition : connection: <hub1>-<hub2> [clé=valeur ...]
         parts = line.split()
         if len(parts) < 2:
@@ -289,7 +269,8 @@ class Parser:
         hub1, hub2 = connection_part.split("-", 1)  # Séparation des deux hubs
         metadata: dict[str, str | int] = {}
         if len(parts) > 2:
-            # Reconstruction de la partie métadonnées (ex: [max_link_capacity=4])
+            # Reconstruction de la partie métadonnées (ex: [max_link_capacity=
+            # 4])
             metadata_part = " ".join(parts[2:])
             if metadata_part.startswith("[") and metadata_part.endswith("]"):
                 metadata_part = metadata_part[1:-1]  # Suppression des crochets
@@ -325,20 +306,18 @@ class Parser:
         Raises:
             ValueError: If two zones share the same name.
         """
+        hubs = [
+            self.config["start_hub"],
+            *self.config["hub"],
+            self.config["end_hub"],
+        ]
+
         names: set[str] = set()
-        for hub in self.config["hub"]:
-            if hub["name"] in names:
-                raise ValueError(f"Duplicate hub name: {hub['name']!r}")
-            names.add(hub["name"])
-        if self.config["start_hub"]["name"] in names:
-            raise ValueError(
-                f"Duplicate hub name: {self.config['start_hub']['name']!r}"
-            )
-        names.add(self.config["start_hub"]["name"])
-        if self.config["end_hub"]["name"] in names:
-            raise ValueError(
-                f"Duplicate hub name: {self.config['end_hub']['name']!r}"
-            )
+        for hub in hubs:
+            name = hub["name"]
+            if name in names:
+                raise ValueError(f"Duplicate hub name: {name!r}")
+            names.add(name)
 
     def _check_duplicate_connections(self) -> None:
         """Check that no connection is defined twice
@@ -360,11 +339,12 @@ class Parser:
         Raises:
             ValueError: If a connection references an undefined zone.
         """
-        known_names: set[str] = set()
-        known_names.add(self.config["start_hub"]["name"])
-        known_names.add(self.config["end_hub"]["name"])
-        for hub in self.config["hub"]:
-            known_names.add(hub["name"])
+        known_names = {
+            self.config["start_hub"]["name"],
+            self.config["end_hub"]["name"],
+        }
+        known_names.update(hub["name"] for hub in self.config["hub"])
+
         for (hub1, hub2, _), line_number in zip(
             self.config["connection"], self._connection_line_numbers
         ):
@@ -378,149 +358,3 @@ class Parser:
                     f"Line {line_number}: "
                     f"Connection references undefined zone: {hub2!r}"
                 )
-
-    def _valid_path(self) -> bool:
-        # Collecte des zones bloquées (inaccessibles aux drones)
-        blocked_zones = {
-            hub["name"]
-            for hub in self.config["hub"]
-            if hub["metadata"].get("zone") == "blocked"
-        }
-        start = self.config["start_hub"]["name"]
-        end = self.config["end_hub"]["name"]
-
-        # Parcours en profondeur (DFS) pour vérifier l'existence d'un chemin
-        stack: list[str] = [start]
-        visited: set[str] = set()
-
-        # Construction de la liste d'adjacence (hors zones bloquées)
-        adjacency = {
-            hub["name"]: []
-            for hub in self.config["hub"]
-            if hub["name"] not in blocked_zones
-        }
-        adjacency[start] = []
-        adjacency[end] = []
-
-        for hub1, hub2, _ in self.config["connection"]:
-            # N'ajouter que les connexions entre hubs non bloqués
-            if hub1 not in blocked_zones and hub2 not in blocked_zones:
-                adjacency[hub1].append(hub2)
-                adjacency[hub2].append(hub1)
-
-        while stack:
-            current = stack.pop()
-            if current == end:
-                return True  # Chemin trouvé
-            if current not in visited:
-                visited.add(current)
-                for neighbor in adjacency[current]:
-                    if neighbor not in visited:
-                        stack.append(neighbor)
-        return False  # Aucun chemin possible
-
-
-if __name__ == "__main__":
-    import sys
-    import os
-
-    # Fichier de carte par défaut (utilisé si aucun argument n'est fourni)
-    _default = os.path.join(
-        os.path.dirname(__file__),
-        "../../assets/maps/challenger/01_the_impossible_dream.txt",
-    )
-    # Utilisation : python parser.py [chemin_du_fichier]
-    path = sys.argv[1] if len(sys.argv) > 1 else _default
-    try:
-        p = Parser(path)
-        config = p.parse()  # Lancement du parsing complet
-
-        if config:
-            # -------------------------------------------------------
-            # Affichage du résultat du parsing
-            # -------------------------------------------------------
-            SEP = "=" * 55
-
-            print(SEP)
-            print(f"  RÉSULTAT DU PARSING : {os.path.basename(path)}")
-            print(SEP)
-
-            # Nombre de drones
-            # Exemple de valeur : 4
-            print(f"\n  Nombre de drones    : {config['nb_drones']}")
-
-            # --- Hub de départ ---
-            # Exemple : {'name': 'depart', 'coordinate': (0, 0), 'metadata': {'color': 'green', 'max_drones': 4}}
-            print(f"\n{SEP}")
-            print("  HUB DE DÉPART (start_hub)")
-            print(SEP)
-            start_hub = config["start_hub"]
-            print(f"  Nom         : {start_hub['name']}")
-            print(
-                f"  Coordonnées : x={start_hub['coordinate'][0]}, y={start_hub['coordinate'][1]}"
-            )
-            if start_hub["metadata"]:
-                print(f"  Métadonnées :")
-                for k, v in start_hub["metadata"].items():
-                    print(f"    - {k} = {v}")
-            else:
-                print("  Métadonnées : aucune")
-
-            # --- Hubs intermédiaires ---
-            # Exemple : [{'name': 'carrefour', 'coordinate': (1, 0), 'metadata': {'max_drones': 2}}]
-            print(f"\n{SEP}")
-            print(f"  HUBS INTERMÉDIAIRES ({len(config['hub'])} hub(s))")
-            print(SEP)
-            if config["hub"]:
-                for i, hub in enumerate(config["hub"], start=1):
-                    print(f"  Hub #{i}")
-                    print(f"    Nom         : {hub['name']}")
-                    print(
-                        f"    Coordonnées : x={hub['coordinate'][0]}, y={hub['coordinate'][1]}"
-                    )
-                    if hub["metadata"]:
-                        print(f"    Métadonnées :")
-                        for k, v in hub["metadata"].items():
-                            print(f"      - {k} = {v}")
-                    else:
-                        print("    Métadonnées : aucune")
-            else:
-                print("  (aucun hub intermédiaire)")
-
-            # --- Hub d'arrivée ---
-            # Exemple : {'name': 'arrivee', 'coordinate': (3, 0), 'metadata': {'color': 'red', 'max_drones': 4}}
-            print(f"\n{SEP}")
-            print("  HUB D'ARRIVÉE (end_hub)")
-            print(SEP)
-            eh = config["end_hub"]
-            print(f"  Nom         : {eh['name']}")
-            print(
-                f"  Coordonnées : x={eh['coordinate'][0]}, y={eh['coordinate'][1]}"
-            )
-            if eh["metadata"]:
-                print(f"  Métadonnées :")
-                for k, v in eh["metadata"].items():
-                    print(f"    - {k} = {v}")
-            else:
-                print("  Métadonnées : aucune")
-
-            # --- Connexions ---
-            # Exemple : [('depart', 'carrefour', {'max_link_capacity': 4}), ('carrefour', 'arrivee', {})]
-            print(f"\n{SEP}")
-            print(f"  CONNEXIONS ({len(config['connection'])} connexion(s))")
-            print(SEP)
-            for i, c in enumerate(config["connection"], start=1):
-                hub1, hub2, meta = c
-                opts = (
-                    ", ".join(f"{k}={v}" for k, v in meta.items())
-                    if meta
-                    else "aucune"
-                )
-                print(f"  #{i:>2}  {hub1} ──► {hub2}  [options: {opts}]")
-
-            print(f"\n{SEP}")
-            print("  Parsing terminé avec succès.")
-            print(SEP)
-
-    except Exception as e:
-        print(f"Erreur lors du parsing : {e}")

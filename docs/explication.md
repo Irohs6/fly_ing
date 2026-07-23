@@ -27,14 +27,14 @@ Dans `simulation.py`, méthode `start()` :
 
 ```python
 def start(self) -> None:
-    pathfinder = Djikstra(self.graph)
+    pathfinder = Dijktra(self.graph)
     path = pathfinder.shortest_path() or []
     for drone in self.drones:
         drone.current_zone = start.name
         drone.path = list(path)[1:]  # ← même chemin pour tous
 ```
 
-`Djikstra.shortest_path()` calcule **un seul chemin optimal** (le plus court en coût).
+`Dijktra.shortest_path()` calcule **un seul chemin optimal** (le plus court en coût).
 Chaque drone reçoit une **copie identique** de ce chemin.
 
 ### Ce qui se passe réellement

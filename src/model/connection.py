@@ -8,7 +8,7 @@ class Connection:
         self.source = source
         self.target = target
         self._max_capacity = capacity
-        self.nb_drones = 0  # Nombre de drones actuellement sur cette connexion
+        self.nb_drones = 0
 
     @property
     def max_capacity(self) -> int:
