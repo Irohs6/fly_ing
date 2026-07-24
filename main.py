@@ -12,7 +12,7 @@ def main() -> None:
 
     try:
         controller = Controller(map_path, debug=debug)
-        controller.display()
+        controller.run()
     except (ValueError, FileNotFoundError, IOError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

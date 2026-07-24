@@ -10,7 +10,7 @@ class Drone:
         self.drone_id = drone_id
         self.current_zone = current_zone
         self.path: list[Zone] = []
-        self.status: str = ""
+        self.status: str = "idle"
         self.transit_turns: int = 0
         self.moving_connection: tuple[bool, Connection | None] = (False, None)
 
@@ -20,7 +20,7 @@ class Drone:
     def move_to_zone(
         self, zone: Zone, connection: Connection | None = None
     ) -> None:
-        if self.current_zone is not None:
+        if self.current_zone is not None and self.current_zone.nb_drones > 0:
             self.current_zone.nb_drones -= 1
         self.current_zone = zone
         zone.nb_drones += 1

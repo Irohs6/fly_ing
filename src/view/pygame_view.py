@@ -162,7 +162,7 @@ class HubRenderer:
 
         # Capacité affichée en dessous (0/max — simulation non démarrée)
         cap_surf = self.font.render(
-            f"0/{zone.max_drones}", True, (255, 255, 255)
+            f"{zone.nb_drones}/{zone.max_drones}", True, (255, 255, 255)
         )
         cap_rect = cap_surf.get_rect(center=(pos[0], pos[1] + hub_r + 20))
         screen.blit(cap_surf, cap_rect)
@@ -194,7 +194,7 @@ class ConnectionRenderer:
 
         # Capacité affichée au milieu de la connexion
         mid = ((pos1[0] + pos2[0]) // 2, (pos1[1] + pos2[1]) // 2)
-        surf = self.font_small.render(f"0/{capacity}", True, (120, 130, 150))
+        surf = self.font_small.render(f"{connection.nb_drones}/{capacity}", True, (120, 130, 150))
         rect = surf.get_rect(center=mid)
         # Fond sombre derrière le texte pour la lisibilité
         pygame.draw.rect(screen, BG_COLOR, rect.inflate(6, 4), border_radius=3)

@@ -22,11 +22,16 @@ class Simulation:
 
     def start(self) -> None:
         start = self.graph.start_zone
+        if start is None:
+            raise ValueError("Start zone is not defined in the graph.")
+
         path = self.ph.shortest_path() or []
+
         for drone in self.drones:
             drone.current_zone = start
             start.nb_drones += 1
             drone.path = list(path)[1:]
+            drone.status = "moving"
         # Enregistrer l'état initial (tour 0)
         self._record_tour()
 
@@ -42,27 +47,28 @@ class Simulation:
                 return None
 
             conn = self.graph.get_connection(
-                drone.current_zone.name, next_zone.name
+                drone.current_zone.name,
+                next_zone.name
             )
+
+            if conn is None:
+                drone.status = "waiting"
+                return None
+
             conn_ok = conn is None or conn.nb_drones < conn.max_capacity
             zone_ok = next_zone.nb_drones < next_zone.max_drones
 
             if zone_ok and conn_ok:
-                if next_zone.zone_type == "restricted":
-                    drone.move_to_zone(next_zone, conn)
-                    drone.moving_connection = (True, conn)
-                    if conn:
-                        conn.add_nb_drone()
-                    drone.path.pop(0)
-                    drone.transit_turns = 0
-                    drone.status = "in_transit"
-                    return f"{drone.drone_id}-{next_zone.name}(transit)"
-
                 drone.move_to_zone(next_zone, conn)
-                if conn:
-                    conn.add_nb_drone()
+                conn.add_nb_drone()
                 drone.path.pop(0)
                 drone.moving_connection = (True, conn)
+
+                if next_zone.zone_type == "restricted":
+                    drone.status = "in_transit"
+                    drone.transit_turns = 0
+                    return f"{drone.drone_id}-{next_zone.name}(transit)"
+
                 drone.status = "moving"
                 if drone.current_zone == self.graph.end_zone:
                     drone.status = "finished"
@@ -92,28 +98,30 @@ class Simulation:
             cost = zone_obj.move_cost() if zone_obj else 1
             if drone.transit_turns >= cost:
                 drone.transit_turns = 0
-                if drone.moving_connection[1]:
-                    drone.moving_connection[1].remove_nb_drone()
-                    drone.moving_connection = (False, None)
-                    drone.status = "moving"
+                conn = drone.moving_connection[1]
+                if conn:
+                    conn.remove_nb_drone()
+                drone.moving_connection = (False, None)
+                drone.status = "moving"
 
     def execute(self) -> None:
         while not all(drone.status == "finished" for drone in self.drones):
             self.turn += 1
             self.advance_transit()
 
-            movements = []
-            used_connections = []
+            movements: list[str] = []
+            used_connections: list[Drone] = []
+
             for drone in self.drones:
                 if drone.status in ("finished", "in_transit"):
                     continue
-                result = self._try_move(drone)
 
+                result = self._try_move(drone)
                 if result:
                     movements.append(result)
-
                 if drone.moving_connection[0]:
                     used_connections.append(drone)
+
             for drone in used_connections:
                 if drone.status != "in_transit":
                     conn = drone.moving_connection[1]
@@ -139,7 +147,7 @@ class Simulation:
 
     def _record_tour(self) -> None:
         """Enregistre la position de chaque drone pour le tour courant."""
-        tour_data = {}
+        tour_data: dict[str, str] = {}
         for drone in self.drones:
             if drone.current_zone:
                 tour_data[drone.drone_id] = drone.current_zone.name

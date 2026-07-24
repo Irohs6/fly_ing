@@ -1,21 +1,21 @@
+from collections import defaultdict
 from .connection import Connection
 from .zone import Zone
-
-from collections import defaultdict
 
 
 class Graph:
     def __init__(
         self,
-        zones: dict[str, Zone] = None,
-        connections: list[Connection] = None,
+        zones: dict[str, Zone] | None = None,
+        connections: list[Connection] | None = None,
     ):
         self.zones: dict[str, Zone] = zones or {}
         self.connections: list[Connection] = connections or []
         self.start_zone: Zone | None = None
         self.end_zone: Zone | None = None
         self.adjacency: dict[str, list[Connection]] = defaultdict(list)
-
+        self.connection_map: dict[tuple[str, str], Connection] = {}
+    
     def add_zone(self, zone: Zone) -> None:
         self.zones[zone.name] = zone
 
@@ -28,13 +28,15 @@ class Graph:
             raise ValueError(f"Unknown zone: {e.args[0]}")
 
         connection = Connection(source_zone, target_zone, max_capacity)
-
         self.connections.append(connection)
 
-        for node in (source, target):
-            self.adjacency[node].append(connection)
+        self.adjacency[source].append(connection)
+        self.adjacency[target].append(connection)
 
-    def _create_zone(self, data: dict[str, any]) -> Zone:
+        self.connection_map[(source, target)] = connection
+        self.connection_map[(target, source)] = connection
+
+    def _create_zone(self, data: dict[str, object]) -> Zone:
         metadata = data.get("metadata", {})
 
         return Zone(
@@ -58,23 +60,26 @@ class Graph:
 
     def load_connections(self, config: dict) -> None:
         for source, target, metadata in config["connection"]:
-            self.add_connection(source, target,
-                                metadata.get("max_link_capacity"))
+            self.add_connection(
+                source,
+                target,
+                metadata.get("max_link_capacity")
+                )
 
     def get_neighbors(self, zone_name: str) -> list[Connection]:
-        return self.adjacency[zone_name]
+        return self.adjacency.get(zone_name, [])
 
     def get_connection(self, source: str, target: str) -> "Connection | None":
-        for conn in self.adjacency.get(source, []):
-            if conn.source.name == target or conn.target.name == target:
-                return conn
-        return None
+        return self.connection_map.get((source, target))
 
     def __str__(self):
         return "Graph:\n" + "\n".join(map(str, self.connections))
 
     def valid_path(self) -> bool:
         # Collecte des zones bloquées (inaccessibles aux drones)
+        if self.start_zone is None or self.end_zone is None:
+            return False  # Si les zones de départ ou d'arrivée ne sont pas définies
+
         blocked_zones = {
             zone.name
             for zone in self.zones.values()
@@ -87,30 +92,22 @@ class Graph:
         stack: list[str] = [start]
         visited: set[str] = set()
 
-        # Construction de la liste d'adjacence (hors zones bloquées)
-        adjacency = {
-            zone.name: []
-            for zone in self.zones.values()
-            if zone.name not in blocked_zones
-        }
-        adjacency[start] = []
-        adjacency[end] = []
-
-        for conn in self.connections:
-            hub1 = conn.source.name
-            hub2 = conn.target.name
-            # N'ajouter que les connexions entre hubs non bloqués
-            if hub1 not in blocked_zones and hub2 not in blocked_zones:
-                adjacency[hub1].append(hub2)
-                adjacency[hub2].append(hub1)
-
         while stack:
             current = stack.pop()
             if current == end:
                 return True  # Chemin trouvé
-            if current not in visited:
-                visited.add(current)
-                for neighbor in adjacency[current]:
-                    if neighbor not in visited:
-                        stack.append(neighbor)
+            if current in visited:
+                continue
+            visited.add(current)
+
+            for conn in self.get_neighbors(current):
+                if conn.source.name == current:
+                    neighbor = conn.target.name
+                else:
+                    neighbor = conn.source.name
+                
+                if neighbor in blocked_zones:
+                    continue  # Ignorer les zones bloquées
+                if neighbor not in visited:
+                    stack.append(neighbor)
         return False  # Aucun chemin possible

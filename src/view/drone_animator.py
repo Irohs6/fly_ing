@@ -33,6 +33,7 @@ DRONE_COLORS: Dict[str, Tuple[int, int, int]] = {
 
 class ReplayState(Enum):
     """État du contrôle de replay."""
+    STOPPED = 0
     PLAYING = 1
     PAUSED = 2
 
