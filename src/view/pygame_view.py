@@ -28,21 +28,7 @@ except ImportError:
 
 # ── Constants
 
-SCREEN_W: int = 1600
-SCREEN_H: int = 900
-CELL_SIZE: int = 160
-
 BG_COLOR = (20, 20, 25)
-TEXT_COLOR = (255, 255, 255)
-CONN_FILL = (55, 60, 78)
-CONN_BORDER = (40, 45, 60)
-
-BAND_WIDTH: int = 9
-
-HUB_BASE_RADIUS: int = 20
-HUB_SCALE: int = 3  # extra px per max_drone unit
-HUB_MIN_RADIUS: int = 20
-HUB_MAX_RADIUS: int = 55
 
 COLOR_MAP: dict[str, tuple[int, int, int]] = {
     "black": (40, 40, 45),
@@ -119,7 +105,6 @@ class Camera:
             int(world_y * self.zoom + sh / 2 + self.pan_y),
         )
 
-
 # ── HubRenderer
 
 
@@ -130,10 +115,16 @@ class HubRenderer:
         self.font = font
         self.font_small = font_small
 
+    HUB_BASE_RADIUS: int = 20
+    HUB_SCALE: int = 3  # extra px per max_drone unit
+    HUB_MIN_RADIUS: int = 20
+    HUB_MAX_RADIUS: int = 55
+    TEXT_COLOR = (255, 255, 255)
+
     def radius(self, zone, zoom: float = 1.0) -> int:
         """Calcule le rayon d'un hub en pixels selon sa capacité et le zoom."""
-        hub_r = HUB_BASE_RADIUS + zone.max_drones * HUB_SCALE
-        hub_r = max(HUB_MIN_RADIUS, min(HUB_MAX_RADIUS, hub_r))
+        hub_r = self.HUB_BASE_RADIUS + zone.max_drones * self.HUB_SCALE
+        hub_r = max(self.HUB_MIN_RADIUS, min(self.HUB_MAX_RADIUS, hub_r))
         return max(4, int(hub_r * zoom))
 
     def draw(
@@ -156,13 +147,13 @@ class HubRenderer:
             pygame.draw.circle(screen, (255, 255, 255), pos, hub_r, 2)
 
         # Nom du hub affiché au-dessus
-        name_surf = self.font_small.render(zone.name, True, TEXT_COLOR)
+        name_surf = self.font_small.render(zone.name, True, self.TEXT_COLOR)
         name_rect = name_surf.get_rect(center=(pos[0], pos[1] - hub_r - 11))
         screen.blit(name_surf, name_rect)
 
         # Capacité affichée en dessous (0/max — simulation non démarrée)
         cap_surf = self.font.render(
-            f"{zone.nb_drones}/{zone.max_drones}", True, (255, 255, 255)
+            f"{zone.nb_drones}/{zone.max_drones}", True, self.TEXT_COLOR
         )
         cap_rect = cap_surf.get_rect(center=(pos[0], pos[1] + hub_r + 20))
         screen.blit(cap_surf, cap_rect)
@@ -174,6 +165,10 @@ class HubRenderer:
 class ConnectionRenderer:
     def __init__(self, font_small: pygame.font.Font) -> None:
         self.font_small = font_small
+
+    CONN_FILL = (55, 60, 78)
+    CONN_BORDER = (40, 45, 60)
+    BAND_WIDTH: int = 9
 
     def draw(
         self,
@@ -188,13 +183,15 @@ class ConnectionRenderer:
             return
 
         # Trait unique, épaisseur mise à l'échelle selon le zoom
-        line_w = max(2, int(BAND_WIDTH * zoom))
-        pygame.draw.line(screen, CONN_FILL, pos1, pos2, line_w)
-        pygame.draw.line(screen, CONN_BORDER, pos1, pos2, max(1, line_w - 2))
+        line_w = max(2, int(self.BAND_WIDTH * zoom))
+        pygame.draw.line(screen, self.CONN_FILL, pos1, pos2, line_w)
+        pygame.draw.line(
+            screen, self.CONN_BORDER, pos1, pos2, max(1, line_w - 2))
 
         # Capacité affichée au milieu de la connexion
         mid = ((pos1[0] + pos2[0]) // 2, (pos1[1] + pos2[1]) // 2)
-        surf = self.font_small.render(f"{connection.nb_drones}/{capacity}", True, (120, 130, 150))
+        surf = self.font_small.render(
+            f"{connection.nb_drones}/{capacity}", True, (120, 130, 150))
         rect = surf.get_rect(center=mid)
         # Fond sombre derrière le texte pour la lisibilité
         pygame.draw.rect(screen, BG_COLOR, rect.inflate(6, 4), border_radius=3)
@@ -211,12 +208,14 @@ class GraphRenderer:
         screen: pygame.Surface,
         font: pygame.font.Font,
         font_small: pygame.font.Font,
+        CELL_SIZE: int = 160,
     ) -> None:
         self.graph = graph
         self.screen = screen
         self.hub_renderer = HubRenderer(font, font_small)
         self.connection_renderer = ConnectionRenderer(font_small)
         self._base: dict[str, tuple[float, float]] = {}
+        self.CELL_SIZE = CELL_SIZE
         self._compute_layout()
 
     def _compute_layout(self) -> None:
@@ -230,8 +229,8 @@ class GraphRenderer:
         center_y = (max(z.y for z in zones) + min(z.y for z in zones)) / 2
         for zone in zones:
             self._base[zone.name] = (
-                (zone.x - center_x) * CELL_SIZE,
-                (zone.y - center_y) * CELL_SIZE,
+                (zone.x - center_x) * self.CELL_SIZE,
+                (zone.y - center_y) * self.CELL_SIZE,
             )
 
     def draw(self, camera: Camera) -> None:
@@ -277,17 +276,28 @@ class Pygame_view:
         self.simulation = simulation
         self.animation_layer = None
 
+    SCREEN_W: int = 1600
+    SCREEN_H: int = 900
+    CELL_SIZE: int = 160
+
+    BG_COLOR: tuple[int, int, int] = (40, 40, 45)
+    HUB_BASE_RADIUS: int = 20
+    HUB_SCALE: int = 3  # extra px per max_drone unit
+    HUB_MIN_RADIUS: int = 20
+    HUB_MAX_RADIUS: int = 55
+
     def display(self) -> None:
         pygame.init()
         screen = pygame.display.set_mode(
-            (SCREEN_W, SCREEN_H), pygame.RESIZABLE
+            (self.SCREEN_W, self.SCREEN_H), pygame.RESIZABLE
         )
         pygame.display.set_caption("Fly'in")
         font = pygame.font.SysFont("time_new_roman", 30)
         font_small = pygame.font.SysFont("times", 20, bold=True)
         clock = pygame.time.Clock()
         camera = Camera()
-        renderer = GraphRenderer(self.graph, screen, font, font_small)
+        renderer = GraphRenderer(self.graph, screen, font, font_small,
+                                 CELL_SIZE=self.CELL_SIZE)
 
         # Créer la couche d'animation des drones si la simulation
         # est disponible
@@ -360,7 +370,7 @@ class Pygame_view:
         for zone in zones:
             # Appliquer la même transformation que GraphRenderer
             hub_positions[zone.name] = (
-                (zone.x - center_x) * CELL_SIZE,
-                (zone.y - center_y) * CELL_SIZE,
+                (zone.x - center_x) * self.CELL_SIZE,
+                (zone.y - center_y) * self.CELL_SIZE,
             )
         return hub_positions

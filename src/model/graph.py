@@ -15,7 +15,7 @@ class Graph:
         self.end_zone: Zone | None = None
         self.adjacency: dict[str, list[Connection]] = defaultdict(list)
         self.connection_map: dict[tuple[str, str], Connection] = {}
-    
+
     def add_zone(self, zone: Zone) -> None:
         self.zones[zone.name] = zone
 
@@ -105,7 +105,7 @@ class Graph:
                     neighbor = conn.target.name
                 else:
                     neighbor = conn.source.name
-                
+
                 if neighbor in blocked_zones:
                     continue  # Ignorer les zones bloquées
                 if neighbor not in visited:
