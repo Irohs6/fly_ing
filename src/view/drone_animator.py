@@ -128,11 +128,8 @@ class AnimatedDrone:
             zoom: Facteur de zoom (par défaut 1.0)
         """
         # Convertir les coordonnées monde en coordonnées écran
-        screen_x, screen_y = camera.to_screen(
-            self.position[0],
-            self.position[1],
-            screen_width,
-            screen_height,
+        screen_x, screen_y = camera.world_to_screen(
+                self.position[0], self.position[1], screen_width, screen_height
         )
 
         # Choisir la couleur selon l'état

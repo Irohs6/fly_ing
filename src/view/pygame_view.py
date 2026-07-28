@@ -1,7 +1,9 @@
 import math
 import os
 from src.model.graph import Graph
-from src.view.drone_animator import DroneAnimationLayer
+from .drone_animator import DroneAnimationLayer
+from .camera import Camera
+from .coordinate_system import CoordinateSystem
 
 os.environ["PYGAME_HIDE_SUPPORT_PROMPT"] = "1"
 
@@ -21,12 +23,10 @@ try:
         K_RIGHT,
     )
 except ImportError:
-    print(
-        "Pygame is not installed. Please install it to run the visualization."
-    )
+    print("Pygame is not installed. Please install it to run the visualization.")
     exit(1)
 
-# ── Constants
+# ── Constants ───────────────────────────────────────────────────────────────
 
 BG_COLOR = (20, 20, 25)
 
@@ -51,107 +51,40 @@ COLOR_MAP: dict[str, tuple[int, int, int]] = {
     "white": (200, 200, 200),
 }
 
-
-# ── Camera ───────────────────────────────────────────────────────────────────
-
-
-class Camera:
-    ZOOM_MIN: float = 0.15
-    ZOOM_MAX: float = 5.0
-
-    def __init__(self) -> None:
-        self.zoom: float = 1.0
-        self.pan_x: float = 0.0
-        self.pan_y: float = 0.0
-        self._drag: tuple | None = None
-
-    def handle_event(self, event, sw: int, sh: int) -> None:
-        if event.type == MOUSEWHEEL:
-            # Zoom centré sur la position de la souris
-            mouse_x, mouse_y = pygame.mouse.get_pos()
-            # Convertir la position souris en coordonnées monde avant zoom
-            world_x = (mouse_x - sw / 2 - self.pan_x) / self.zoom
-            world_y = (mouse_y - sh / 2 - self.pan_y) / self.zoom
-            factor = 1.15 if event.y > 0 else 1 / 1.15
-            self.zoom = max(
-                self.ZOOM_MIN, min(self.ZOOM_MAX, self.zoom * factor)
-            )
-            # Recalculer le pan pour que le point monde reste sous la souris
-            self.pan_x = mouse_x - sw / 2 - world_x * self.zoom
-            self.pan_y = mouse_y - sh / 2 - world_y * self.zoom
-        elif event.type == MOUSEBUTTONDOWN and event.button in (2, 3):
-            # Mémoriser le point de départ du drag et le pan courant
-            self._drag = (*event.pos, self.pan_x, self.pan_y)
-        elif event.type == MOUSEBUTTONUP and event.button in (2, 3):
-            self._drag = None
-        elif event.type == MOUSEMOTION and self._drag:
-            # Déplacer le pan en fonction du déplacement
-            # depuis le début du drag
-            drag_start_x, drag_start_y, pan_start_x, pan_start_y = self._drag
-            self.pan_x = pan_start_x + event.pos[0] - drag_start_x
-            self.pan_y = pan_start_y + event.pos[1] - drag_start_y
-
-    def reset(self) -> None:
-        self.zoom = 1.0
-        self.pan_x = 0.0
-        self.pan_y = 0.0
-
-    def to_screen(
-        self, world_x: float, world_y: float, sw: int, sh: int
-    ) -> tuple[int, int]:
-        """Convertit des coordonnées monde en pixels écran."""
-        return (
-            int(world_x * self.zoom + sw / 2 + self.pan_x),
-            int(world_y * self.zoom + sh / 2 + self.pan_y),
-        )
-
-# ── HubRenderer
+# ── HubRenderer ─────────────────────────────────────────────────────────────
 
 
 class HubRenderer:
-    def __init__(
-        self, font: pygame.font.Font, font_small: pygame.font.Font
-    ) -> None:
-        self.font = font
-        self.font_small = font_small
-
     HUB_BASE_RADIUS: int = 20
-    HUB_SCALE: int = 3  # extra px per max_drone unit
+    HUB_SCALE: int = 3
     HUB_MIN_RADIUS: int = 20
     HUB_MAX_RADIUS: int = 55
     TEXT_COLOR = (255, 255, 255)
 
+    def __init__(self, font: pygame.font.Font, font_small: pygame.font.Font):
+        self.font = font
+        self.font_small = font_small
+
     def radius(self, zone, zoom: float = 1.0) -> int:
-        """Calcule le rayon d'un hub en pixels selon sa capacité et le zoom."""
         hub_r = self.HUB_BASE_RADIUS + zone.max_drones * self.HUB_SCALE
         hub_r = max(self.HUB_MIN_RADIUS, min(self.HUB_MAX_RADIUS, hub_r))
         return max(4, int(hub_r * zoom))
 
-    def draw(
-        self,
-        screen: pygame.Surface,
-        zone,
-        pos: tuple[int, int],
-        zoom: float = 1.0,
-        is_start: bool = False,
-        is_end: bool = False,
-    ) -> None:
+    def draw(self, screen, zone, pos, zoom=1.0, is_start=False, is_end=False):
         color = COLOR_MAP.get(zone.color, (200, 200, 200))
         hub_r = self.radius(zone, zoom)
 
         pygame.draw.circle(screen, color, pos, hub_r)
+
         if is_start or is_end:
-            # Bordure épaisse dorée pour distinguer les hubs de départ/arrivée
             pygame.draw.circle(screen, (255, 215, 0), pos, hub_r, 3)
         else:
             pygame.draw.circle(screen, (255, 255, 255), pos, hub_r, 2)
 
-        # Nom du hub affiché au-dessus
         name_surf = self.font_small.render(zone.name, True, self.TEXT_COLOR)
         name_rect = name_surf.get_rect(center=(pos[0], pos[1] - hub_r - 11))
         screen.blit(name_surf, name_rect)
 
-        # Capacité affichée en dessous (0/max — simulation non démarrée)
         cap_surf = self.font.render(
             f"{zone.nb_drones}/{zone.max_drones}", True, self.TEXT_COLOR
         )
@@ -159,101 +92,64 @@ class HubRenderer:
         screen.blit(cap_surf, cap_rect)
 
 
-# ── ConnectionRenderer
+# ── ConnectionRenderer ──────────────────────────────────────────────────────
 
 
 class ConnectionRenderer:
-    def __init__(self, font_small: pygame.font.Font) -> None:
-        self.font_small = font_small
-
     CONN_FILL = (55, 60, 78)
     CONN_BORDER = (40, 45, 60)
     BAND_WIDTH: int = 9
 
-    def draw(
-        self,
-        screen: pygame.Surface,
-        connection,
-        pos1: tuple[int, int],
-        pos2: tuple[int, int],
-        zoom: float = 1.0,
-    ) -> None:
-        capacity = connection.max_capacity
+    def __init__(self, font_small: pygame.font.Font):
+        self.font_small = font_small
+
+    def draw(self, screen, connection, pos1, pos2, zoom=1.0):
         if math.hypot(pos2[0] - pos1[0], pos2[1] - pos1[1]) == 0:
             return
 
-        # Trait unique, épaisseur mise à l'échelle selon le zoom
         line_w = max(2, int(self.BAND_WIDTH * zoom))
         pygame.draw.line(screen, self.CONN_FILL, pos1, pos2, line_w)
-        pygame.draw.line(
-            screen, self.CONN_BORDER, pos1, pos2, max(1, line_w - 2))
+        pygame.draw.line(screen, self.CONN_BORDER, pos1, pos2, max(1, line_w - 2))
 
-        # Capacité affichée au milieu de la connexion
         mid = ((pos1[0] + pos2[0]) // 2, (pos1[1] + pos2[1]) // 2)
         surf = self.font_small.render(
-            f"{connection.nb_drones}/{capacity}", True, (120, 130, 150))
+            f"{connection.nb_drones}/{connection.max_capacity}",
+            True,
+            (120, 130, 150),
+        )
         rect = surf.get_rect(center=mid)
-        # Fond sombre derrière le texte pour la lisibilité
         pygame.draw.rect(screen, BG_COLOR, rect.inflate(6, 4), border_radius=3)
         screen.blit(surf, rect)
 
 
-# ── GraphRenderer
+# ── GraphRenderer ───────────────────────────────────────────────────────────
 
 
 class GraphRenderer:
-    def __init__(
-        self,
-        graph: Graph,
-        screen: pygame.Surface,
-        font: pygame.font.Font,
-        font_small: pygame.font.Font,
-        CELL_SIZE: int = 160,
-    ) -> None:
+    def __init__(self, graph, screen, font, font_small, coordinate_system):
         self.graph = graph
         self.screen = screen
+        self.coord = coordinate_system
+        self.world_positions = self.coord.world_positions
+
         self.hub_renderer = HubRenderer(font, font_small)
         self.connection_renderer = ConnectionRenderer(font_small)
-        self._base: dict[str, tuple[float, float]] = {}
-        self.CELL_SIZE = CELL_SIZE
-        self._compute_layout()
 
-    def _compute_layout(self) -> None:
-        """Calcule les coordonnées monde de chaque hub,
-        centrées sur l'origine."""
-        zones = list(self.graph.zones.values())
-        if not zones:
-            return
-        # Centre géométrique de la grille pour centrer la carte à l'écran
-        center_x = (max(z.x for z in zones) + min(z.x for z in zones)) / 2
-        center_y = (max(z.y for z in zones) + min(z.y for z in zones)) / 2
-        for zone in zones:
-            self._base[zone.name] = (
-                (zone.x - center_x) * self.CELL_SIZE,
-                (zone.y - center_y) * self.CELL_SIZE,
-            )
-
-    def draw(self, camera: Camera) -> None:
-        """Efface l'écran et redessine tout le graphe via la caméra."""
+    def draw(self, camera):
         screen_w, screen_h = self.screen.get_size()
         self.screen.fill(BG_COLOR)
 
-        # Convertir toutes les positions monde en pixels écran une seule fois
         positions = {
-            name: camera.to_screen(world_x, world_y, screen_w, screen_h)
-            for name, (world_x, world_y) in self._base.items()
+            name: camera.world_to_screen(x, y, screen_w, screen_h)
+            for name, (x, y) in self.world_positions.items()
         }
 
-        # Connexions dessinées en premier (sous les hubs)
         for conn in self.graph.connections:
-            pos_source = positions.get(conn.source.name)
-            pos_target = positions.get(conn.target.name)
-            if pos_source and pos_target:
-                self.connection_renderer.draw(
-                    self.screen, conn, pos_source, pos_target, camera.zoom
-                )
+            pos1 = positions.get(conn.source.name)
+            pos2 = positions.get(conn.target.name)
+            if pos1 and pos2:
+                self.connection_renderer.draw(self.screen, conn, pos1, pos2, camera.zoom)
 
-        # Hubs dessinés par-dessus les connexions
         for zone in self.graph.zones.values():
             pos = positions.get(zone.name)
             if pos:
@@ -267,75 +163,85 @@ class GraphRenderer:
                 )
 
 
-# ── Pygame_view (driver)
+# ── Pygame_view ─────────────────────────────────────────────────────────────
 
 
 class Pygame_view:
-    def __init__(self, graph: Graph, simulation=None) -> None:
+    SCREEN_W = 1600
+    SCREEN_H = 900
+    CELL_SIZE = 160
+
+    def __init__(self, graph: Graph, simulation=None):
         self.graph = graph
         self.simulation = simulation
         self.animation_layer = None
 
-    SCREEN_W: int = 1600
-    SCREEN_H: int = 900
-    CELL_SIZE: int = 160
-
-    BG_COLOR: tuple[int, int, int] = (40, 40, 45)
-    HUB_BASE_RADIUS: int = 20
-    HUB_SCALE: int = 3  # extra px per max_drone unit
-    HUB_MIN_RADIUS: int = 20
-    HUB_MAX_RADIUS: int = 55
-
-    def display(self) -> None:
+    def display(self):
         pygame.init()
-        screen = pygame.display.set_mode(
-            (self.SCREEN_W, self.SCREEN_H), pygame.RESIZABLE
-        )
+        screen = pygame.display.set_mode((self.SCREEN_W, self.SCREEN_H), pygame.RESIZABLE)
         pygame.display.set_caption("Fly'in")
+
         font = pygame.font.SysFont("time_new_roman", 30)
         font_small = pygame.font.SysFont("times", 20, bold=True)
         clock = pygame.time.Clock()
-        camera = Camera()
-        renderer = GraphRenderer(self.graph, screen, font, font_small,
-                                 CELL_SIZE=self.CELL_SIZE)
 
-        # Créer la couche d'animation des drones si la simulation
-        # est disponible
+        camera = Camera()
+
+        coord = CoordinateSystem(cell_size=self.CELL_SIZE)
+        coord.compute(self.graph.zones.values())
+
+        renderer = GraphRenderer(self.graph, screen, font, font_small, coord)
+
         if self.simulation and self.simulation.tours:
-            hub_positions = self._extract_hub_positions()
             self.animation_layer = DroneAnimationLayer(
-                hub_positions=hub_positions,
+                hub_positions=coord.world_positions,
                 tours=self.simulation.tours,
                 auto_replay_speed=1.5,
             )
 
         running = True
         while running:
-            dt = clock.tick(60) / 1000.0  # Temps en secondes
+            dt = clock.tick(60) / 1000.0
             screen_w, screen_h = screen.get_size()
+
             for event in pygame.event.get():
                 if event.type == QUIT:
                     running = False
-                elif event.type == KEYDOWN:
-                    if event.key == K_ESCAPE:  # Quitter
-                        running = False
-                    elif event.key == K_r:  # Réinitialiser la caméra
-                        camera.reset()
-                else:
-                    # Déléguer zoom et pan à la caméra
-                    camera.handle_event(event, screen_w, screen_h)
 
-                # Traiter les événements de replay (SPACE, RIGHT, LEFT, R)
+                elif event.type == KEYDOWN:
+                    if event.key == K_ESCAPE:
+                        running = False
+                    elif event.key == K_r:
+                        camera.reset()
+
+                else:
+                    # Gestion du zoom
+                    if event.type == MOUSEWHEEL:
+                        mouse_x, mouse_y = pygame.mouse.get_pos()
+                        factor = 1.15 if event.y > 0 else 1 / 1.15
+                        camera.apply_zoom(mouse_x, mouse_y, screen_w, screen_h, factor)
+
+                    # Début du drag (bouton milieu ou droit)
+                    elif event.type == MOUSEBUTTONDOWN and event.button in (2, 3):
+                        camera.start_drag(event.pos[0], event.pos[1])
+
+                    # Fin du drag
+                    elif event.type == MOUSEBUTTONUP and event.button in (2, 3):
+                        camera.end_drag()
+
+                    # Drag en cours
+                    elif event.type == MOUSEMOTION:
+                        camera.drag(event.pos[0], event.pos[1])
+
+
                 if self.animation_layer:
                     self.animation_layer.handle_event(event)
 
-            # Mise à jour de l'animation
             if self.animation_layer:
                 self.animation_layer.update(dt)
 
             renderer.draw(camera)
 
-            # Dessiner les drones animés
             if self.animation_layer:
                 self.animation_layer.draw(
                     surface=screen,
@@ -354,23 +260,3 @@ class Pygame_view:
             pygame.display.flip()
 
         pygame.quit()
-
-    def _extract_hub_positions(self) -> dict:
-        """Extrait les positions des hubs à partir du graphe."""
-        # Utiliser les mêmes coordonnées que GraphRenderer._base
-        zones = list(self.graph.zones.values())
-        if not zones:
-            return {}
-
-        # Centre géométrique de la grille pour centrer la carte à l'écran
-        center_x = (max(z.x for z in zones) + min(z.x for z in zones)) / 2
-        center_y = (max(z.y for z in zones) + min(z.y for z in zones)) / 2
-
-        hub_positions = {}
-        for zone in zones:
-            # Appliquer la même transformation que GraphRenderer
-            hub_positions[zone.name] = (
-                (zone.x - center_x) * self.CELL_SIZE,
-                (zone.y - center_y) * self.CELL_SIZE,
-            )
-        return hub_positions
