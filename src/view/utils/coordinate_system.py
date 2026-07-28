@@ -4,7 +4,7 @@ class CoordinateSystem:
     en coordonnées monde centrées autour de (0, 0).
     """
 
-    def __init__(self, cell_size: int = 160):
+    def __init__(self, cell_size: int = 400):
         self.cell_size = cell_size
         self.world_positions = {}  # {zone_name: (world_x, world_y)}
 

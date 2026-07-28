@@ -105,20 +105,20 @@ class Pygame_view:
             # Draw graph
             renderer.draw(camera)
 
-            # Draw drones
+            # Draw drones + overlay
             if self.animation_layer:
                 self.animation_layer.draw(
-                    surface=screen,
-                    camera=camera,
-                    screen_width=screen_w,
-                    screen_height=screen_h,
-                    zoom=camera.zoom,
+                    screen,
+                    camera,
+                    screen_w,
+                    screen_h,
+                    camera.zoom,
                 )
                 self.animation_layer.draw_overlay(
-                    surface=screen,
-                    font=font_small,
-                    screen_width=screen_w,
-                    screen_height=screen_h,
+                    screen,
+                    font_small,
+                    screen_w,
+                    screen_h,
                 )
 
             pygame.display.flip()
