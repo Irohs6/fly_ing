@@ -1,4 +1,3 @@
-import os
 import pygame
 
 from pygame.locals import (
@@ -39,7 +38,7 @@ class Pygame_view:
         pygame.display.set_caption("Fly'in")
 
         font = pygame.font.SysFont("time_new_roman", 30)
-        font_small = pygame.font.SysFont("times", 20, bold=True)
+        font_small = pygame.font.SysFont("arial", 20, bold=True)
         clock = pygame.time.Clock()
 
         # Camera & Coordinate system
@@ -83,7 +82,8 @@ class Pygame_view:
                 elif event.type == MOUSEWHEEL:
                     mouse_x, mouse_y = pygame.mouse.get_pos()
                     factor = 1.15 if event.y > 0 else 1 / 1.15
-                    camera.apply_zoom(mouse_x, mouse_y, screen_w, screen_h, factor)
+                    camera.apply_zoom(mouse_x, mouse_y, screen_w,
+                                      screen_h, factor)
 
                 elif event.type == MOUSEBUTTONDOWN and event.button in (2, 3):
                     camera.start_drag(event.pos[0], event.pos[1])

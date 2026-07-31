@@ -1,13 +1,10 @@
 import math
 import pygame
 
-from src.view.utils.camera import Camera
-from src.view.utils.coordinate_system import CoordinateSystem
-
-
 # ───────────────────────────────────────────────
 # HubRenderer
 # ───────────────────────────────────────────────
+
 
 class HubRenderer:
     BG_COLOR = (20, 20, 25)
@@ -44,30 +41,54 @@ class HubRenderer:
         self.font_small = font_small
 
     def radius(self, zone, zoom):
-        r = self.HUB_BASE_RADIUS + zone.max_drones * self.HUB_SCALE
-        r = max(self.HUB_MIN_RADIUS, min(self.HUB_MAX_RADIUS, r))
-        return max(4, int(r * zoom))
+        # Rayon calculé en fonction de la capacité maximale du hub
+        hub_radius = self.HUB_BASE_RADIUS + zone.max_drones * self.HUB_SCALE
 
-    def draw(self, screen, zone, pos, zoom, is_start=False, is_end=False):
-        color = self.COLOR_MAP.get(zone.color, (200, 200, 200))
-        r = self.radius(zone, zoom)
+        # On limite le rayon entre une valeur minimale et maximale
+        hub_radius = max(self.HUB_MIN_RADIUS, min(self.HUB_MAX_RADIUS,
+                         hub_radius))
 
-        pygame.draw.circle(screen, color, pos, r)
+        # Application du zoom
+        return max(4, int(hub_radius * zoom))
 
+    def draw(self, screen, zone, position, zoom, is_start=False, is_end=False):
+        # Couleur du hub
+        hub_color = self.COLOR_MAP.get(zone.color, (200, 200, 200))
+
+        # Calcul du rayon
+        hub_radius = self.radius(zone, zoom)
+
+        # Dessin du cercle principal
+        pygame.draw.circle(screen, hub_color, position, hub_radius)
+
+        # Dessin du contour (or pour départ/arrivée, blanc sinon)
         if is_start or is_end:
-            pygame.draw.circle(screen, (255, 215, 0), pos, r, 3)
+            pygame.draw.circle(screen, (255, 215, 0), position, hub_radius, 3)
         else:
-            pygame.draw.circle(screen, (255, 255, 255), pos, r, 2)
+            pygame.draw.circle(screen, (255, 255, 255),
+                               position, hub_radius, 2)
 
-        name_surf = self.font_small.render(zone.name, True, self.TEXT_COLOR)
-        name_rect = name_surf.get_rect(center=(pos[0], pos[1] - r - 11))
-        screen.blit(name_surf, name_rect)
-
-        cap_surf = self.font.render(
-            f"{zone.nb_drones}/{zone.max_drones}", True, self.TEXT_COLOR
+        # Affichage du nom du hub au-dessus
+        hub_name_surface = self.font_small.render(
+            zone.name,
+            True,
+            self.TEXT_COLOR,
         )
-        cap_rect = cap_surf.get_rect(center=(pos[0], pos[1] + r + 20))
-        screen.blit(cap_surf, cap_rect)
+        hub_name_rect = hub_name_surface.get_rect(
+            center=(position[0], position[1] - hub_radius - 20)
+        )
+        screen.blit(hub_name_surface, hub_name_rect)
+
+        # Affichage du nombre de drones / capacité maximale
+        capacity_surface = self.font.render(
+            f"{zone.nb_drones}/{zone.max_drones}",
+            True,
+            self.TEXT_COLOR,
+        )
+        capacity_rect = capacity_surface.get_rect(
+            center=(position[0], position[1] + hub_radius + 20)
+        )
+        screen.blit(capacity_surface, capacity_rect)
 
 
 # ───────────────────────────────────────────────
@@ -83,28 +104,63 @@ class ConnectionRenderer:
     def __init__(self, font_small):
         self.font_small = font_small
 
-    def draw(self, screen, connection, pos1, pos2, zoom):
-        if math.hypot(pos2[0] - pos1[0], pos2[1] - pos1[1]) == 0:
+    def draw(self, screen, connection, source_position, target_position, zoom):
+        # Ne rien dessiner si les deux hubs sont au même endroit
+        if math.hypot(
+            target_position[0] - source_position[0],
+            target_position[1] - source_position[1],
+        ) == 0:
             return
 
-        w = max(2, int(self.BAND_WIDTH * zoom))
-        pygame.draw.line(screen, self.CONN_FILL, pos1, pos2, w)
-        pygame.draw.line(screen, self.CONN_BORDER, pos1, pos2, max(1, w - 2))
+        # Épaisseur de la connexion selon le zoom
+        connection_width = max(2, int(self.BAND_WIDTH * zoom))
 
-        mid = ((pos1[0] + pos2[0]) // 2, (pos1[1] + pos2[1]) // 2)
-        surf = self.font_small.render(
+        # Bande principale
+        pygame.draw.line(
+            screen,
+            self.CONN_FILL,
+            source_position,
+            target_position,
+            connection_width,
+        )
+
+        # Contour de la bande
+        pygame.draw.line(
+            screen,
+            self.CONN_BORDER,
+            source_position,
+            target_position,
+            max(1, connection_width - 2),
+        )
+
+        # Position du texte au milieu de la connexion
+        middle_position = (
+            (source_position[0] + target_position[0]) // 2,
+            (source_position[1] + target_position[1]) // 2,
+        )
+
+        # Nombre de drones présents sur la connexion
+        connection_text = self.font_small.render(
             f"{connection.nb_drones}/{connection.max_capacity}",
             True,
             (120, 130, 150),
         )
-        rect = surf.get_rect(center=mid)
-        pygame.draw.rect(screen, self.BG_COLOR, rect.inflate(6, 4), border_radius=3)
-        screen.blit(surf, rect)
 
+        connection_text_rect = connection_text.get_rect(center=middle_position)
 
+        # Fond derrière le texte pour améliorer la lisibilité
+        pygame.draw.rect(
+            screen,
+            self.BG_COLOR,
+            connection_text_rect.inflate(6, 4),
+            border_radius=3,
+        )
+
+        screen.blit(connection_text, connection_text_rect)
 # ───────────────────────────────────────────────
 # GraphRenderer
 # ───────────────────────────────────────────────
+
 
 class GraphRenderer:
     BG_COLOR = (20, 20, 25)
@@ -119,29 +175,30 @@ class GraphRenderer:
         self.connection_renderer = ConnectionRenderer(font_small)
 
     def draw(self, camera):
-        screen_w, screen_h = self.screen.get_size()
+        screen_width, screen_height = self.screen.get_size()
         self.screen.fill(self.BG_COLOR)
 
-        positions = {
-            name: camera.world_to_screen(x, y, screen_w, screen_h)
+        hub_screen_positions = {
+            name: camera.world_to_screen(x, y, screen_width, screen_height)
             for name, (x, y) in self.world_positions.items()
         }
 
-        for conn in self.graph.connections:
-            pos1 = positions.get(conn.source.name)
-            pos2 = positions.get(conn.target.name)
-            if pos1 and pos2:
+        for connection in self.graph.connections:
+            source_pos = hub_screen_positions.get(connection.source.name)
+            target_pos = hub_screen_positions.get(connection.target.name)
+            if source_pos and target_pos:
                 self.connection_renderer.draw(
-                    self.screen, conn, pos1, pos2, camera.zoom
+                    self.screen, connection, source_pos, target_pos,
+                    camera.zoom
                 )
 
         for zone in self.graph.zones.values():
-            pos = positions.get(zone.name)
-            if pos:
+            hub_pos = hub_screen_positions.get(zone.name)
+            if hub_pos:
                 self.hub_renderer.draw(
                     self.screen,
                     zone,
-                    pos,
+                    hub_pos,
                     zoom=camera.zoom,
                     is_start=(zone == self.graph.start_zone),
                     is_end=(zone == self.graph.end_zone),

@@ -35,7 +35,6 @@ class Camera:
         screen_y = world_y * self.zoom + screen_h / 2 + self.pan_y
         return int(screen_x), int(screen_y)
 
-
     def screen_to_world(self, screen_x, screen_y, screen_w, screen_h):
         """
         Convertit des pixels écran en coordonnées monde.
@@ -69,7 +68,8 @@ class Camera:
         """
 
         # Position monde avant zoom
-        world_x, world_y = self.screen_to_world(mouse_x, mouse_y, screen_w, screen_h)
+        world_x, world_y = self.screen_to_world(mouse_x, mouse_y,
+                                                screen_w, screen_h)
 
         # Appliquer le zoom
         new_zoom = self.zoom * factor
