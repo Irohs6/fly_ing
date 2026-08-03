@@ -1,0 +1,8 @@
+[flake8]
+exclude =
+    .venv,
+    .git,
+    __pycache__,
+    docs/pathfinding,
+    assets
+max-line-length = 79

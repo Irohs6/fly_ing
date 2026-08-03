@@ -1,4 +1,5 @@
 from src.model.graph import Graph
+from src.model.pathfinder import Dijkstra
 from src.view.pygame_view import Pygame_view
 from src.parser.parser import Parser
 from src.model.simulation import Simulation
@@ -27,7 +28,10 @@ class Controller:
         if not self.graph.valid_path():
             raise ValueError("No valid path from start to end zone.")
 
-        self.simulation = Simulation(self.graph, debug=self.debug)
+        pathfinder = Dijkstra(self.graph)
+        self.simulation = Simulation(
+            self.graph, debug=self.debug, pathfinder=pathfinder
+        )
         self.simulation.load_drones(self.config["nb_drones"])
         self.simulation.simulate()
 

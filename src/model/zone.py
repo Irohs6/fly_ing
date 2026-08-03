@@ -1,4 +1,5 @@
 from __future__ import annotations
+from .error import Zone_Error
 
 
 class Zone:
@@ -6,8 +7,8 @@ class Zone:
         self,
         name: str,
         color: str = "white",
-        zone_type: str = None,
-        max_drones: int = None,
+        zone_type: str | None = None,
+        max_drones: int | None = None,
         x: int = 0,
         y: int = 0,
     ):
@@ -31,22 +32,22 @@ class Zone:
     def zone_type(self, value: str) -> None:
         self._zone_type = value
 
-    def add_nb_drone(self):
+    def add_nb_drone(self) -> None:
         if self.nb_drones < self.max_drones:
             self.nb_drones += 1
         else:
-            raise ValueError("Maximum number of drones reached")
+            raise Zone_Error("Maximum number of drones reached")
 
-    def move_cost(self) -> int:
+    def move_cost(self) -> float:
         if self.zone_type == "restricted":
-            return 2
+            return 2.0
         elif self.zone_type == "blocked":
             return float("inf")
         else:
-            return 1
+            return 1.0
 
-    def __str__(self):
+    def __str__(self) -> str:
         return f"{self.name}"
 
-    def __repr__(self):
+    def __repr__(self) -> str:
         return f"{self.name}"

@@ -1,5 +1,7 @@
 import math
 import pygame
+from .sprite.hub_sprite import HubSprite
+
 
 # ───────────────────────────────────────────────
 # HubRenderer
@@ -59,7 +61,8 @@ class HubRenderer:
         hub_radius = self.radius(zone, zoom)
 
         # Dessin du cercle principal
-        pygame.draw.circle(screen, hub_color, position, hub_radius)
+        HubSprite(zone, radius=hub_radius,
+                  color=hub_color).draw(screen, position)
 
         # Dessin du contour (or pour départ/arrivée, blanc sinon)
         if is_start or is_end:
@@ -67,28 +70,6 @@ class HubRenderer:
         else:
             pygame.draw.circle(screen, (255, 255, 255),
                                position, hub_radius, 2)
-
-        # Affichage du nom du hub au-dessus
-        hub_name_surface = self.font_small.render(
-            zone.name,
-            True,
-            self.TEXT_COLOR,
-        )
-        hub_name_rect = hub_name_surface.get_rect(
-            center=(position[0], position[1] - hub_radius - 20)
-        )
-        screen.blit(hub_name_surface, hub_name_rect)
-
-        # Affichage du nombre de drones / capacité maximale
-        capacity_surface = self.font.render(
-            f"{zone.nb_drones}/{zone.max_drones}",
-            True,
-            self.TEXT_COLOR,
-        )
-        capacity_rect = capacity_surface.get_rect(
-            center=(position[0], position[1] + hub_radius + 20)
-        )
-        screen.blit(capacity_surface, capacity_rect)
 
 
 # ───────────────────────────────────────────────
@@ -133,30 +114,6 @@ class ConnectionRenderer:
             max(1, connection_width - 2),
         )
 
-        # Position du texte au milieu de la connexion
-        middle_position = (
-            (source_position[0] + target_position[0]) // 2,
-            (source_position[1] + target_position[1]) // 2,
-        )
-
-        # Nombre de drones présents sur la connexion
-        connection_text = self.font_small.render(
-            f"{connection.nb_drones}/{connection.max_capacity}",
-            True,
-            (120, 130, 150),
-        )
-
-        connection_text_rect = connection_text.get_rect(center=middle_position)
-
-        # Fond derrière le texte pour améliorer la lisibilité
-        pygame.draw.rect(
-            screen,
-            self.BG_COLOR,
-            connection_text_rect.inflate(6, 4),
-            border_radius=3,
-        )
-
-        screen.blit(connection_text, connection_text_rect)
 # ───────────────────────────────────────────────
 # GraphRenderer
 # ───────────────────────────────────────────────

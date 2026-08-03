@@ -1,4 +1,26 @@
 
+from __future__ import annotations
+from typing import TypedDict, cast
+
+
+class ZoneConfig(TypedDict):
+    """Typed configuration for a zone/hub."""
+
+    name: str
+    coordinate: tuple[int, int]
+    metadata: dict[str, str | int]
+
+
+class MapConfig(TypedDict):
+    """Fully-parsed and validated map configuration."""
+
+    nb_drones: int
+    start_hub: ZoneConfig
+    end_hub: ZoneConfig
+    hub: list[ZoneConfig]
+    connection: list[tuple[str, str, dict[str, str | int]]]
+
+
 class Parser:
     """Parses drone routing map files into a structured config dict."""
 
@@ -17,28 +39,19 @@ class Parser:
         """
         # Chemin vers le fichier de carte à analyser
         self.file_path = file_path
-        # Dictionnaire de configuration résultant du parsing
-        # start_hub  : hub de départ (unique)
-        # end_hub    : hub d'arrivée (unique)
-        # hub        : liste des hubs intermédiaires
-        # connection : liste des connexions entre hubs
-        # nb_drones  : nombre de drones à simuler
-        self.config = {
-            "start_hub": None,
-            "end_hub": None,
-            "hub": [],
-            "connection": [],
-            "nb_drones": None,
-        }
-        # Numéros de ligne source pour chaque connexion
-        #  (même index que config["connection"])
+        self._nb_drones: int | None = None
+        self._start_hub: ZoneConfig | None = None
+        self._end_hub: ZoneConfig | None = None
+        self._hub: list[ZoneConfig] = []
+        self._connection: list[tuple[str, str, dict[str, str | int]]] = []
         self._connection_line_numbers: list[int] = []
 
-    def parse(self) -> dict:
+    def parse(self) -> MapConfig:
         """Parse the map file and return the structured config dict.
 
         Returns:
-            A dict with keys: nb_drones, start_hub, end_hub, hub, connection.
+            A MapConfig with keys: nb_drones,
+            start_hub, end_hub, hub, connection.
 
         Raises:
             FileNotFoundError: If the file does not exist.
@@ -60,7 +73,13 @@ class Parser:
             raise ValueError(f"Parse error: {e}") from e
         except IOError as e:
             raise IOError(f"Error reading file {self.file_path}: {e}") from e
-        return self.config
+        return MapConfig(
+            nb_drones=cast(int, self._nb_drones),
+            start_hub=cast(ZoneConfig, self._start_hub),
+            end_hub=cast(ZoneConfig, self._end_hub),
+            hub=self._hub,
+            connection=self._connection,
+        )
 
     def _read_file(self) -> list[tuple[int, str]]:
         """Read the file and return meaningful (line_number, content) pairs.
@@ -120,7 +139,7 @@ class Parser:
                         f"got: {raw!r}"
                     )
                 nb_drones = int(raw)
-                self.config["nb_drones"] = nb_drones
+                self._nb_drones = nb_drones
             elif (
                 line.startswith("start_hub:")  # Hub de départ
                 or line.startswith("hub:")  # Hub intermédiaire
@@ -137,7 +156,7 @@ class Parser:
                 )
         if nb_drones is None:
             raise ValueError("Missing nb_drones definition")
-        self.config["nb_drones"] = nb_drones
+        self._nb_drones = nb_drones
 
     def _validate(self) -> None:
         """Run all post-parse validation checks on self.config.
@@ -146,7 +165,7 @@ class Parser:
             ValueError: If any validation fails.
         """
         # Vérification de la présence obligatoire du hub de départ et d'arrivée
-        if self.config["start_hub"] is None or self.config["end_hub"] is None:
+        if self._start_hub is None or self._end_hub is None:
             raise ValueError("Missing start_hub or end_hub definition")
         # Vérification de l'unicité des noms de hubs
         self._check_duplicate_hub_names()
@@ -177,10 +196,10 @@ class Parser:
         # Récupération du type de hub (start_hub / hub / end_hub)
         hub_type = parts[0].rstrip(":")  # start_hub, hub, or end_hub
         name = parts[1]  # Nom unique du hub
-        if "-" in name:
+        if "-" in name or " " in name:
             raise ValueError(
                 f"Line {number_ligne}: "
-                f"zone name {name!r} cannot contain dashes"
+                f"zone name {name!r} cannot contain dashes or spaces"
             )
         try:
             # Coordonnées (x, y) en entiers
@@ -198,6 +217,11 @@ class Parser:
             if metadata_part.startswith("[") and metadata_part.endswith("]"):
                 metadata_part = metadata_part[1:-1]  # Suppression des crochets
                 for option in metadata_part.split():
+                    if "=" not in option:
+                        raise ValueError(
+                            f"Line {number_ligne}: malformed metadata option "
+                            f"{option!r}, expected 'key=value'"
+                        )
                     key, value = option.split("=", 1)
                     if key not in self.VALID_HUB_METADATA_KEYS:
                         raise ValueError(
@@ -211,13 +235,17 @@ class Parser:
                         )
                     if key == "max_drones":
                         if hub_type in ("start_hub", "end_hub"):
-                            metadata["max_drones"] = self.config["nb_drones"]
+                            # Ignore user value: start/end capacity = nb_drones
+                            metadata["max_drones"] = cast(
+                                int, self._nb_drones
+                            )
                         elif not value.isdigit() or int(value) < 1:
                             raise ValueError(
                                 f"Line {number_ligne}: "
                                 f"{key} must be a positive integer"
                             )
-                        metadata[key] = int(value)
+                        else:
+                            metadata[key] = int(value)
                     else:
                         metadata[key] = value
             else:
@@ -226,20 +254,25 @@ class Parser:
                     f"metadata must be enclosed in [...], got: "
                     f"{metadata_part!r}"
                 )
-        if hub_type in ("start_hub", "end_hub"):
-            if self.config[hub_type] is not None:
+        zone_data: ZoneConfig = {
+            "name": name,
+            "coordinate": (x, y),
+            "metadata": metadata,
+        }
+        if hub_type == "start_hub":
+            if self._start_hub is not None:
                 raise ValueError(
                     f"Line {number_ligne}: duplicate {hub_type} definition"
                 )
-            self.config[hub_type] = {
-                "name": name,
-                "coordinate": (x, y),
-                "metadata": metadata,
-            }
+            self._start_hub = zone_data
+        elif hub_type == "end_hub":
+            if self._end_hub is not None:
+                raise ValueError(
+                    f"Line {number_ligne}: duplicate {hub_type} definition"
+                )
+            self._end_hub = zone_data
         else:
-            self.config["hub"].append(
-                {"name": name, "coordinate": (x, y), "metadata": metadata}
-            )
+            self._hub.append(zone_data)
 
     def _parse_connection_line(self, line: str, number_ligne: int) -> None:
         """Parse a connection line and add it to self.config.
@@ -275,6 +308,11 @@ class Parser:
             if metadata_part.startswith("[") and metadata_part.endswith("]"):
                 metadata_part = metadata_part[1:-1]  # Suppression des crochets
                 for option in metadata_part.split():
+                    if "=" not in option:
+                        raise ValueError(
+                            f"Line {number_ligne}: malformed metadata option "
+                            f"{option!r}, expected 'key=value'"
+                        )
                     key, value = option.split("=", 1)
                     if key not in self.VALID_CONNECTION_METADATA_KEYS:
                         raise ValueError(
@@ -297,7 +335,7 @@ class Parser:
                     f"metadata must be enclosed in [...], got: "
                     f"{metadata_part!r}"
                 )
-        self.config["connection"].append((hub1, hub2, metadata))
+        self._connection.append((hub1, hub2, metadata))
         self._connection_line_numbers.append(number_ligne)
 
     def _check_duplicate_hub_names(self) -> None:
@@ -306,10 +344,10 @@ class Parser:
         Raises:
             ValueError: If two zones share the same name.
         """
-        hubs = [
-            self.config["start_hub"],
-            *self.config["hub"],
-            self.config["end_hub"],
+        hubs: list[ZoneConfig] = [
+            cast(ZoneConfig, self._start_hub),
+            *self._hub,
+            cast(ZoneConfig, self._end_hub),
         ]
 
         names: set[str] = set()
@@ -327,7 +365,7 @@ class Parser:
             ValueError: If a duplicate connection is found.
         """
         connections: set[tuple[str, str]] = set()
-        for c in self.config["connection"]:
+        for c in self._connection:
             hub1, hub2 = c[0], c[1]
             if (hub1, hub2) in connections or (hub2, hub1) in connections:
                 raise ValueError(f"Duplicate connection: {hub1!r} - {hub2!r}")
@@ -340,13 +378,13 @@ class Parser:
             ValueError: If a connection references an undefined zone.
         """
         known_names = {
-            self.config["start_hub"]["name"],
-            self.config["end_hub"]["name"],
+            cast(ZoneConfig, self._start_hub)["name"],
+            cast(ZoneConfig, self._end_hub)["name"],
         }
-        known_names.update(hub["name"] for hub in self.config["hub"])
+        known_names.update(hub["name"] for hub in self._hub)
 
         for (hub1, hub2, _), line_number in zip(
-            self.config["connection"], self._connection_line_numbers
+            self._connection, self._connection_line_numbers
         ):
             if hub1 not in known_names:
                 raise ValueError(

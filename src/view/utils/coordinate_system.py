@@ -1,17 +1,21 @@
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from src.model.zone import Zone
+
+
 class CoordinateSystem:
-    """
-    Gère la transformation des coordonnées logiques (x, y)
-    en coordonnées monde centrées autour de (0, 0).
-    """
+    """Coordinate system for the graphical representation of the graph
+        centered around (0, 0)."""
 
     def __init__(self, cell_size: int = 400):
         self.cell_size = cell_size
-        self.world_positions = {}  # {zone_name: (world_x, world_y)}
+        self.world_positions: dict[str, tuple[float, float]] = {}
 
-    def compute(self, zones):
+    def compute(self, zones: list["Zone"]) -> dict[str, tuple[float, float]]:
         """
-        Calcule les coordonnées monde de chaque zone.
-        zones : iterable d'objets ayant .name, .x, .y
+        Computes the world positions of the zones, centered around (0, 0).
         """
         zones = list(zones)
         if not zones:
@@ -37,6 +41,8 @@ class CoordinateSystem:
 
         return self.world_positions
 
-    def get(self, zone_name):
-        """Retourne la position monde d'un hub."""
+    def get(self, zone_name: str) -> tuple[float, float] | None:
+        """
+        Returns the world position of the specified zone.
+        """
         return self.world_positions.get(zone_name)

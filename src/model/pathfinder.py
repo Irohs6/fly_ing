@@ -2,7 +2,7 @@ from .graph import Graph
 from heapq import heappush, heappop
 
 
-class Dijktra:
+class Dijkstra:
     def __init__(self, graph: Graph):
         self.graph = graph
 
@@ -71,7 +71,7 @@ class Dijktra:
         )
 
         if distances[target] == float("inf"):
-            return None
+            return []
 
         path = []
         current = target

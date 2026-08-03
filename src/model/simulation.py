@@ -1,15 +1,17 @@
 from .drone import Drone
 from .graph import Graph
-from .pathfinder import Dijktra
+from .pathfinder import Dijkstra
+from .error import Graph_Error
 
 
 class Simulation:
-    def __init__(self, graph: Graph, debug: bool) -> None:
+    def __init__(self, graph: Graph, debug: bool,
+                 pathfinder: Dijkstra | None = None) -> None:
         self.graph = graph
         self.drones: list[Drone] = []
         self.turn = 0
         self.debug = debug
-        self.ph = Dijktra(graph)
+        self.ph = pathfinder if pathfinder is not None else Dijkstra(graph)
         self.tours: list[dict[str, str]] = []  # Historique des positions
 
     def add_drone(self, drone: Drone) -> None:
@@ -23,7 +25,7 @@ class Simulation:
     def start(self) -> None:
         start = self.graph.start_zone
         if start is None:
-            raise ValueError("Start zone is not defined in the graph.")
+            raise Graph_Error("Start zone is not defined in the graph.")
 
         path = self.ph.shortest_path() or []
 
@@ -39,23 +41,23 @@ class Simulation:
         # Tente de déplacer le drone vers sa prochaine zone.
         # Retourne la description du mouvement ou None si impossible.
         blocked_candidates: set[str] = set()
+        max_iter = len(self.graph.zones) + 1
 
-        while True:
+        for _ in range(max_iter):
             next_zone = drone.path[0] if drone.path else None
             if next_zone is None:
                 drone.status = "waiting"
                 return None
 
             conn = self.graph.get_connection(
-                drone.current_zone.name,
-                next_zone.name
+                drone.current_zone.name, next_zone.name
             )
 
             if conn is None:
                 drone.status = "waiting"
                 return None
 
-            conn_ok = conn is None or conn.nb_drones < conn.max_capacity
+            conn_ok = conn.nb_drones < conn.max_capacity
             zone_ok = next_zone.nb_drones < next_zone.max_drones
 
             if zone_ok and conn_ok:
@@ -65,6 +67,10 @@ class Simulation:
                 drone.moving_connection = (True, conn)
 
                 if next_zone.zone_type == "restricted":
+                    # Drone is in transit: undo the nb_drones increment done
+                    # by move_to_zone(). The count will be restored in
+                    # advance_transit() once the drone actually arrives.
+                    next_zone.nb_drones -= 1
                     drone.status = "in_transit"
                     drone.transit_turns = 0
                     return f"{drone.drone_id}-{next_zone.name}(transit)"
@@ -89,6 +95,9 @@ class Simulation:
                 return None
             drone.path = new_path[1:]
 
+        drone.status = "waiting"
+        return None
+
     def advance_transit(self) -> None:
         for drone in self.drones:
             if drone.status != "in_transit":
@@ -102,9 +111,13 @@ class Simulation:
                 if conn:
                     conn.remove_nb_drone()
                 drone.moving_connection = (False, None)
+                # Drone has arrived at the restricted zone — now count it.
+                drone.current_zone.nb_drones += 1
                 drone.status = "moving"
 
     def execute(self) -> None:
+        max_stall = len(self.drones) * len(self.graph.zones) + 1
+        stalled_turns = 0
         while not all(drone.status == "finished" for drone in self.drones):
             self.turn += 1
             self.advance_transit()
@@ -128,6 +141,21 @@ class Simulation:
                     if conn:
                         conn.remove_nb_drone()
                     drone.moving_connection = (False, None)
+
+            # Deadlock detection: if no drone moved and none are in transit,
+            # no progress is possible.
+            any_progress = bool(movements) or any(
+                d.status == "in_transit" for d in self.drones
+            )
+            if not any_progress:
+                stalled_turns += 1
+                if stalled_turns >= max_stall:
+                    raise Graph_Error(
+                        f"Deadlock: no progress after {max_stall} "
+                        f"stalled turns."
+                    )
+            else:
+                stalled_turns = 0
 
             if self.debug:
                 waiting = [

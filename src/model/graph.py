@@ -25,7 +25,7 @@ class Graph:
             source_zone = self.zones[source]
             target_zone = self.zones[target]
         except KeyError as e:
-            raise ValueError(f"Unknown zone: {e.args[0]}")
+            raise KeyError(f"Unknown zone: {e.args[0]}")
 
         connection = Connection(source_zone, target_zone, max_capacity)
         self.connections.append(connection)
@@ -78,7 +78,8 @@ class Graph:
     def valid_path(self) -> bool:
         # Collecte des zones bloquées (inaccessibles aux drones)
         if self.start_zone is None or self.end_zone is None:
-            return False  # Si les zones de départ ou d'arrivée ne sont pas définies
+            return False
+            # Si les zones de départ ou d'arrivée ne sont pas définies
 
         blocked_zones = {
             zone.name

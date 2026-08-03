@@ -60,6 +60,7 @@ class Pygame_view:
             self.animation_layer = DroneAnimationLayer(
                 hub_positions=coord.world_positions,
                 tours=self.simulation.tours,
+                graph=self.graph,
                 auto_replay_speed=1.5,
             )
 
@@ -113,6 +114,7 @@ class Pygame_view:
                     screen_w,
                     screen_h,
                     camera.zoom,
+                    font_small,
                 )
                 self.animation_layer.draw_overlay(
                     screen,
