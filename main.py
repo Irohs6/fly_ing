@@ -13,6 +13,9 @@ def main() -> None:
     try:
         controller = Controller(map_path, debug=debug)
         controller.run()
+    except KeyboardInterrupt:
+        print("Simulation interrupted.", file=sys.stderr)
+        sys.exit(130)
     except (ValueError, FileNotFoundError, IOError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

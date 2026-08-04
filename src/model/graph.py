@@ -43,7 +43,7 @@ class Graph:
             name=data["name"],
             color=metadata.get("color", "white"),
             zone_type=metadata.get("zone", "normal"),
-            max_drones=metadata.get("max_drones", 1),
+            max_drones=metadata.get("max_drones"),
             x=data["coordinate"][0],
             y=data["coordinate"][1],
         )

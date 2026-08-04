@@ -1,5 +1,5 @@
 from .zone import Zone
-from .error import Connection_Error
+from .error import ConnectionError
 
 
 class Connection:
@@ -20,13 +20,13 @@ class Connection:
         if self.nb_drones < self.max_capacity:
             self.nb_drones += 1
         else:
-            raise Connection_Error("Maximum number of drones reached")
+            raise ConnectionError("Maximum number of drones reached")
 
     def remove_nb_drone(self) -> None:
         if self.nb_drones > 0:
             self.nb_drones -= 1
         else:
-            raise Connection_Error("No drones to remove")
+            raise ConnectionError("No drones to remove")
 
     def __str__(self) -> str:
         return (

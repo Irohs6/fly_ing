@@ -20,7 +20,6 @@ class Drone:
     def move_to_zone(
         self, zone: Zone, connection: Connection | None = None
     ) -> None:
-        if self.current_zone is not None and self.current_zone.nb_drones > 0:
-            self.current_zone.nb_drones -= 1
+        if self.current_zone is not None:
+            self.current_zone.remove_nb_drone()
         self.current_zone = zone
-        zone.nb_drones += 1

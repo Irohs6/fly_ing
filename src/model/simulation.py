@@ -13,6 +13,7 @@ class Simulation:
         self.debug = debug
         self.ph = pathfinder if pathfinder is not None else Dijkstra(graph)
         self.tours: list[dict[str, str]] = []  # Historique des positions
+        self.replay_frames: list[dict[str, object]] = []
 
     def add_drone(self, drone: Drone) -> None:
         # Ajoute un drone à la liste des drones de la simulation
@@ -31,7 +32,7 @@ class Simulation:
 
         for drone in self.drones:
             drone.current_zone = start
-            start.nb_drones += 1
+            start.add_nb_drone()
             drone.path = list(path)[1:]
             drone.status = "moving"
         # Enregistrer l'état initial (tour 0)
@@ -63,14 +64,11 @@ class Simulation:
             if zone_ok and conn_ok:
                 drone.move_to_zone(next_zone, conn)
                 conn.add_nb_drone()
+                next_zone.add_nb_drone()  # réserve la place dès maintenant
                 drone.path.pop(0)
                 drone.moving_connection = (True, conn)
 
                 if next_zone.zone_type == "restricted":
-                    # Drone is in transit: undo the nb_drones increment done
-                    # by move_to_zone(). The count will be restored in
-                    # advance_transit() once the drone actually arrives.
-                    next_zone.nb_drones -= 1
                     drone.status = "in_transit"
                     drone.transit_turns = 0
                     return f"{drone.drone_id}-{next_zone.name}(transit)"
@@ -78,7 +76,7 @@ class Simulation:
                 drone.status = "moving"
                 if drone.current_zone == self.graph.end_zone:
                     drone.status = "finished"
-                    drone.current_zone.nb_drones -= 1
+                    drone.current_zone.remove_nb_drone()
                 return f"{drone.drone_id}-{next_zone.name}"
 
             if next_zone.zone_type == "priority":
@@ -111,8 +109,7 @@ class Simulation:
                 if conn:
                     conn.remove_nb_drone()
                 drone.moving_connection = (False, None)
-                # Drone has arrived at the restricted zone — now count it.
-                drone.current_zone.nb_drones += 1
+                # La place est déjà réservée depuis l'entrée en transit.
                 drone.status = "moving"
 
     def execute(self) -> None:
@@ -176,10 +173,41 @@ class Simulation:
     def _record_tour(self) -> None:
         """Enregistre la position de chaque drone pour le tour courant."""
         tour_data: dict[str, str] = {}
+        drone_states: dict[str, dict[str, object]] = {}
+
         for drone in self.drones:
             if drone.current_zone:
                 tour_data[drone.drone_id] = drone.current_zone.name
+
+            conn = drone.moving_connection[1]
+            drone_states[drone.drone_id] = {
+                "zone": drone.current_zone.name if drone.current_zone else None,
+                "status": drone.status,
+                "transit_turns": drone.transit_turns,
+                "connection": {
+                    "source": conn.source.name,
+                    "target": conn.target.name,
+                } if conn is not None else None,
+            }
+
         self.tours.append(tour_data)
+        self.replay_frames.append({
+            "turn": self.turn,
+            "drones": drone_states,
+            "zones": {
+                name: {"count": zone.nb_drones, "max": zone.max_drones}
+                for name, zone in self.graph.zones.items()
+            },
+            "connections": {
+                f"{c.source.name}->{c.target.name}": {
+                    "source": c.source.name,
+                    "target": c.target.name,
+                    "count": c.nb_drones,
+                    "max": c.max_capacity,
+                }
+                for c in self.graph.connections
+            },
+        })
 
     def stop(self) -> None:
         # Point d'arrêt de la simulation (extensible pour un nettoyage futur)

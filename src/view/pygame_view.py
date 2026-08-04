@@ -56,10 +56,10 @@ class Pygame_view:
         )
 
         # Drone animation layer
-        if self.simulation and self.simulation.tours:
+        if self.simulation and self.simulation.replay_frames:
             self.animation_layer = DroneAnimationLayer(
                 hub_positions=coord.world_positions,
-                tours=self.simulation.tours,
+                replay_frames=self.simulation.replay_frames,
                 graph=self.graph,
                 auto_replay_speed=1.5,
             )

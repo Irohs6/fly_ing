@@ -38,6 +38,12 @@ class Zone:
         else:
             raise Zone_Error("Maximum number of drones reached")
 
+    def remove_nb_drone(self) -> None:
+        if self.nb_drones > 0:
+            self.nb_drones -= 1
+        else:
+            raise Zone_Error("No drones to remove")
+
     def move_cost(self) -> float:
         if self.zone_type == "restricted":
             return 2.0

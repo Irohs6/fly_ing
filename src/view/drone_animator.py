@@ -3,8 +3,9 @@ Animation des drones + contrôle de replay (version simplifiée).
 """
 
 import pygame
+import math
 from enum import Enum
-from typing import Dict, List, Tuple
+from typing import Dict, List, Tuple, Any
 from src.view.sprite.drone_sprite import DroneSprite
 
 # ───────────────────────────────────────────────
@@ -255,37 +256,53 @@ class DroneAnimationLayer:
     def __init__(
         self,
         hub_positions: Dict[str, Tuple[float, float]],
-        tours: List[Dict[str, str]],
+        replay_frames: List[Dict[str, Any]],
         graph=None,
         auto_replay_speed=1.0,
     ):
         self.hub_positions = hub_positions
-        self.tours = tours
+        self.replay_frames = replay_frames
         self.graph = graph
         self.drones: Dict[str, AnimatedDrone] = {}
-        self.controller = ReplayController(len(tours), auto_replay_speed)
+        self.controller = ReplayController(len(replay_frames),
+                                           auto_replay_speed)
         self.last_turn = -1
 
         self._init_drones()
         self._apply_turn(0)
 
     def _init_drones(self):
-        if not self.tours:
+        if not self.replay_frames:
             return
-        for drone_id, hub in self.tours[0].items():
+        frame = self.replay_frames[0]
+        drones = frame.get("drones", {})
+        for drone_id, data in drones.items():
+            hub = data.get("zone")
+            if not isinstance(hub, str):
+                continue
             self.drones[drone_id] = AnimatedDrone(
                 drone_id, self.hub_positions, hub
             )
 
     def _apply_turn(self, idx: int) -> None:
-        if idx == self.last_turn or idx < 0 or idx >= len(self.tours):
+        if idx == self.last_turn or idx < 0 or idx >= len(self.replay_frames):
             return
 
-        for drone_id, hub in self.tours[idx].items():
+        frame = self.replay_frames[idx]
+        drones = frame.get("drones", {})
+
+        for drone_id, data in drones.items():
+            hub = data.get("zone")
+            if not isinstance(hub, str):
+                continue
             if drone_id not in self.drones:
-                prev = (
-                    self.tours[idx - 1].get(drone_id, hub) if idx > 0 else hub
-                )
+                prev = hub
+                if idx > 0:
+                    prev_frame = self.replay_frames[idx - 1]
+                    prev_d = prev_frame.get("drones", {}).get(drone_id, {})
+                    prev_zone = prev_d.get("zone")
+                    if isinstance(prev_zone, str):
+                        prev = prev_zone
                 self.drones[drone_id] = AnimatedDrone(
                     drone_id, self.hub_positions, prev
                 )
@@ -306,17 +323,93 @@ class DroneAnimationLayer:
 
     def draw(self, surf, camera, sw, sh, zoom, font=None):
         current_turn = self.controller.turn
-        current_tour = (
-            self.tours[current_turn] if current_turn < len(self.tours) else {}
+        frame: Dict[str, Any] = (
+            self.replay_frames[current_turn]
+            if current_turn < len(self.replay_frames)
+            else {}
         )
+        zone_states = frame.get("zones", {})
+        drone_states = frame.get("drones", {})
 
-        # Live hub occupancy from tour data
         occupancy: Dict[str, int] = {}
-        for hub in current_tour.values():
-            occupancy[hub] = occupancy.get(hub, 0) + 1
+        for zone_name, zone_data in zone_states.items():
+            if not isinstance(zone_data, dict):
+                continue
+            count = zone_data.get("count")
+            if isinstance(count, int):
+                occupancy[zone_name] = count
 
         # Draw drone sprites + ID labels
-        for drone in self.drones.values():
+        transit_groups: Dict[Tuple[str, str], List[str]] = {}
+        for drone_id, dstate in drone_states.items():
+            if dstate.get("status") != "in_transit":
+                continue
+            conn = dstate.get("connection")
+            if not isinstance(conn, dict):
+                continue
+            src_name = conn.get("source")
+            dst_name = conn.get("target")
+            if not isinstance(src_name, str) or not isinstance(dst_name, str):
+                continue
+            key = (src_name, dst_name)
+            transit_groups.setdefault(key, []).append(drone_id)
+
+        for drone_id, drone in self.drones.items():
+            dstate = drone_states.get(drone_id, {})
+            status = dstate.get("status")
+            if status == "in_transit":
+                conn = dstate.get("connection")
+                if isinstance(conn, dict):
+                    src_name = conn.get("source")
+                    dst_name = conn.get("target")
+                    src = self.hub_positions.get(src_name)
+                    dst = self.hub_positions.get(dst_name)
+                    if src and dst:
+                        transit_turns = dstate.get("transit_turns", 0)
+                        if not isinstance(transit_turns, int):
+                            transit_turns = 0
+
+                        transit_cost = 2
+                        zone_name = dstate.get("zone")
+                        if (
+                            isinstance(zone_name, str)
+                            and self.graph is not None
+                            and zone_name in self.graph.zones
+                        ):
+                            transit_cost = int(
+                                self.graph.zones[zone_name].move_cost()
+                            )
+                        transit_cost = max(1, transit_cost)
+
+                        progress = min(
+                            1.0,
+                            max(0.0, (transit_turns + 0.5) / transit_cost),
+                        )
+
+                        bx = src[0] + (dst[0] - src[0]) * progress
+                        by = src[1] + (dst[1] - src[1]) * progress
+
+                        key = (src_name, dst_name)
+                        group = transit_groups.get(key, [])
+                        if drone_id in group and len(group) > 1:
+                            idx = group.index(drone_id)
+                            center = (len(group) - 1) / 2.0
+                            rank = idx - center
+
+                            dx = dst[0] - src[0]
+                            dy = dst[1] - src[1]
+                            length = math.hypot(dx, dy)
+                            if length > 0:
+                                px = -dy / length
+                                py = dx / length
+                                spread = 0.12
+                                bx += px * rank * spread
+                                by += py * rank * spread
+
+                        drone.pos = (
+                            bx,
+                            by,
+                        )
             drone.draw(surf, camera, sw, sh, zoom, font)
 
         if font is None:
