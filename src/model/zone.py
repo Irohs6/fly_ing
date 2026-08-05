@@ -19,10 +19,12 @@ class Zone:
         self.nb_drones = 0
         self.x = x
         self.y = y
+        self.is_start = False
+        self.is_end = False
 
     @property
-    def max_drones(self) -> int:
-        return self._max_drones if self._max_drones is not None else 1
+    def max_drones(self):
+        return self._max_drones
 
     @property
     def zone_type(self) -> str:
@@ -33,6 +35,10 @@ class Zone:
         self._zone_type = value
 
     def add_nb_drone(self) -> None:
+        if self.max_drones is None:
+            self.nb_drones += 1
+            return
+
         if self.nb_drones < self.max_drones:
             self.nb_drones += 1
         else:
@@ -51,6 +57,12 @@ class Zone:
             return float("inf")
         else:
             return 1.0
+
+    def can_accept_drone(self) -> bool:
+        if self.is_start or self.is_end:
+            return True
+
+        return self.nb_drones < self.max_drones
 
     def __str__(self) -> str:
         return f"{self.name}"

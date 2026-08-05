@@ -1,5 +1,6 @@
 import sys
 from src.controller.controller import Controller
+from src.model.error import GraphError
 
 
 def main() -> None:
@@ -16,6 +17,9 @@ def main() -> None:
     except KeyboardInterrupt:
         print("Simulation interrupted.", file=sys.stderr)
         sys.exit(130)
+    except GraphError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
     except (ValueError, FileNotFoundError, IOError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

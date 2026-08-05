@@ -50,7 +50,10 @@ class Graph:
 
     def load_zones(self, config: dict) -> None:
         self.start_zone = self._create_zone(config["start_hub"])
+        self.start_zone.is_start = True
+
         self.end_zone = self._create_zone(config["end_hub"])
+        self.end_zone.is_end = True
 
         for zone in (self.start_zone, self.end_zone):
             self.add_zone(zone)

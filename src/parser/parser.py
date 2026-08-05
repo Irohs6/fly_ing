@@ -1,6 +1,7 @@
 
 from __future__ import annotations
 from typing import TypedDict, cast
+import math
 
 
 class ZoneConfig(TypedDict):
@@ -184,95 +185,127 @@ class Parser:
         Raises:
             ValueError: If the line format or metadata is invalid.
         """
-        # Exemple de ligne attendue : start_hub: depart 0 0
-        # [color=green max_drones=4]
-        # Décomposition : <type>: <nom> <x> <y> [clé=valeur ...]
+        # Format attendu :
+        # start_hub: name x y [metadata]
+        # hub: name x y [metadata]
+        # end_hub: name x y [metadata]
+
         parts = line.split()
+
         if len(parts) < 4:
             raise ValueError(
                 f"Line {number_ligne}: hub line must have format "
                 f"'<type>: <name> <x> <y> [metadata]'"
             )
-        # Récupération du type de hub (start_hub / hub / end_hub)
-        hub_type = parts[0].rstrip(":")  # start_hub, hub, or end_hub
-        name = parts[1]  # Nom unique du hub
+
+        hub_type = parts[0].rstrip(":")
+        name = parts[1]
+
         if "-" in name or " " in name:
             raise ValueError(
                 f"Line {number_ligne}: "
                 f"zone name {name!r} cannot contain dashes or spaces"
             )
+
         try:
-            # Coordonnées (x, y) en entiers
             x, y = int(parts[2]), int(parts[3])
         except ValueError:
             raise ValueError(
-                f"Line {number_ligne}: invalid coordinates: {parts[2]!r}, "
-                f"{parts[3]!r}"
+                f"Line {number_ligne}: invalid coordinates: "
+                f"{parts[2]!r}, {parts[3]!r}"
             )
+
         metadata: dict[str, str | int] = {}
+
         if len(parts) > 4:
-            # Reconstruction de la partie métadonnées
-            # (ex: [color=blue max_drones=3])
             metadata_part = " ".join(parts[4:])
-            if metadata_part.startswith("[") and metadata_part.endswith("]"):
-                metadata_part = metadata_part[1:-1]  # Suppression des crochets
-                for option in metadata_part.split():
-                    if "=" not in option:
-                        raise ValueError(
-                            f"Line {number_ligne}: malformed metadata option "
-                            f"{option!r}, expected 'key=value'"
-                        )
-                    key, value = option.split("=", 1)
-                    if key not in self.VALID_HUB_METADATA_KEYS:
-                        raise ValueError(
-                            f"Line {number_ligne}: unknown hub metadata key "
-                            f"{key!r}, allowed: "
-                            f"{sorted(self.VALID_HUB_METADATA_KEYS)}"
-                        )
-                    if key == "zone" and value not in self.VALID_ZONE_TYPES:
+
+            if not (
+                metadata_part.startswith("[")
+                and metadata_part.endswith("]")
+            ):
+                raise ValueError(
+                    f"Line {number_ligne}: metadata must be enclosed in [...], "
+                    f"got: {metadata_part!r}"
+                )
+
+            metadata_part = metadata_part[1:-1]
+
+            for option in metadata_part.split():
+                if "=" not in option:
+                    raise ValueError(
+                        f"Line {number_ligne}: malformed metadata option "
+                        f"{option!r}, expected 'key=value'"
+                    )
+
+                key, value = option.split("=", 1)
+
+                if key not in self.VALID_HUB_METADATA_KEYS:
+                    raise ValueError(
+                        f"Line {number_ligne}: unknown hub metadata key "
+                        f"{key!r}, allowed: "
+                        f"{sorted(self.VALID_HUB_METADATA_KEYS)}"
+                    )
+
+                if key == "zone":
+                    if value not in self.VALID_ZONE_TYPES:
                         raise ValueError(
                             f"Line {number_ligne}: invalid zone type {value!r}"
                         )
-                    if key == "max_drones":
-                        if hub_type in ("start_hub", "end_hub"):
-                            # Ignore user value: start/end capacity = nb_drones
-                            metadata["max_drones"] = cast(
-                                int, self._nb_drones
-                            )
-                        elif not value.isdigit() or int(value) < 1:
-                            raise ValueError(
-                                f"Line {number_ligne}: "
-                                f"{key} must be a positive integer"
-                            )
-                        else:
-                            metadata[key] = int(value)
+                    metadata[key] = value
+
+                elif key == "color":
+                    metadata[key] = value
+
+                elif key == "max_drones":
+                    # start_hub et end_hub sont toujours illimités
+                    if hub_type in ("start_hub", "end_hub"):
+                        metadata[key] = math.inf
+
+                    elif not value.isdigit() or int(value) < 1:
+                        raise ValueError(
+                            f"Line {number_ligne}: "
+                            f"max_drones must be a positive integer"
+                        )
+
                     else:
-                        metadata[key] = value
+                        metadata[key] = int(value)
+
+        # Valeurs par défaut obligatoires
+        # A ce stade chaque Zone aura toujours une capacité définie
+        if "max_drones" not in metadata:
+            if hub_type in ("start_hub", "end_hub"):
+                metadata["max_drones"] = math.inf
             else:
-                raise ValueError(
-                    f"Line {number_ligne}: "
-                    f"metadata must be enclosed in [...], got: "
-                    f"{metadata_part!r}"
-                )
+                metadata["max_drones"] = 1
+
         zone_data: ZoneConfig = {
             "name": name,
             "coordinate": (x, y),
             "metadata": metadata,
         }
+
         if hub_type == "start_hub":
             if self._start_hub is not None:
                 raise ValueError(
                     f"Line {number_ligne}: duplicate {hub_type} definition"
                 )
             self._start_hub = zone_data
+
         elif hub_type == "end_hub":
             if self._end_hub is not None:
                 raise ValueError(
                     f"Line {number_ligne}: duplicate {hub_type} definition"
                 )
             self._end_hub = zone_data
-        else:
+
+        elif hub_type == "hub":
             self._hub.append(zone_data)
+
+        else:
+            raise ValueError(
+                f"Line {number_ligne}: unknown hub type {hub_type!r}"
+            )
 
     def _parse_connection_line(self, line: str, number_ligne: int) -> None:
         """Parse a connection line and add it to self.config.

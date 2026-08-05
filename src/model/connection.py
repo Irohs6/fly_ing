@@ -28,6 +28,9 @@ class Connection:
         else:
             raise ConnectionError("No drones to remove")
 
+    def can_accept_drone(self) -> bool:
+        return self.nb_drones < self.max_capacity
+
     def __str__(self) -> str:
         return (
             f"{self.source} -> {self.target} "
