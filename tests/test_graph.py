@@ -18,27 +18,54 @@ def _minimal_config(
     nb_drones: int = 1,
     hubs: list | None = None,
     connections: object = _SENTINEL,
-) -> dict:
-    """Return a minimal config dict understood by Graph.load_zones/connections.
+) -> tuple[dict, dict, dict, dict, dict]:
+    """Return a minimal parser-like tuple for Graph.load_* methods.
 
     Pass ``connections=[]`` to get a graph with no edges.
     Omit ``connections`` to get a default direct start->end connection.
     """
     if connections is _SENTINEL:
         connections = [("start", "end", {})]
-    return {
-        "nb_drones": nb_drones,
-        "start_hub": {"name": "start", "coordinate": (0, 0), "metadata": {}},
-        "end_hub": {"name": "end", "coordinate": (4, 0), "metadata": {}},
-        "hub": hubs or [],
-        "connection": connections,
-    }
+
+    hub_items = []
+    for hub in hubs or []:
+        coord = hub.get("coordinate", (hub.get("x", 0), hub.get("y", 0)))
+        hub_items.append(
+            {
+                "line": 0,
+                "name": hub["name"],
+                "x": coord[0],
+                "y": coord[1],
+                "zone_type": "hub",
+                "metadata": hub.get("metadata", {}),
+            }
+        )
+
+    connection_items = []
+    for source, target, metadata in connections:
+        connection_items.append(
+            {
+                "line": 0,
+                "source": source,
+                "target": target,
+                "metadata": metadata,
+            }
+        )
+
+    return (
+        {"line": 1, "value": nb_drones},
+        {"line": 2, "name": "start", "x": 0, "y": 0, "zone_type": "start", "metadata": {}},
+        {"line": 3, "name": "end", "x": 4, "y": 0, "zone_type": "end", "metadata": {}},
+        {"hub": hub_items},
+        {"connection": connection_items},
+    )
 
 
-def _build_graph(config: dict) -> Graph:
+def _build_graph(parsed: tuple[dict, dict, dict, dict, dict]) -> Graph:
     g = Graph()
-    g.load_zones(config)
-    g.load_connections(config)
+    _, start_hub, end_hub, hubs, connections = parsed
+    g.load_zones(start_hub, end_hub, hubs)
+    g.load_connections(connections)
     return g
 
 
@@ -177,8 +204,8 @@ class TestGraphConstruction:
 
     def test_connection_missing_zone_raises(self) -> None:
         g = Graph()
-        config = _minimal_config()
-        g.load_zones(config)
+        _, start_hub, end_hub, hubs, _ = _minimal_config()
+        g.load_zones(start_hub, end_hub, hubs)
         with pytest.raises(KeyError):
             g.add_connection("start", "nonexistent")
 

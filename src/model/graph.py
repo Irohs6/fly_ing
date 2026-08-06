@@ -1,3 +1,4 @@
+from typing import Any
 from collections import defaultdict
 from .connection import Connection
 from .zone import Zone
@@ -36,34 +37,42 @@ class Graph:
         self.connection_map[(source, target)] = connection
         self.connection_map[(target, source)] = connection
 
-    def _create_zone(self, data: dict[str, object]) -> Zone:
-        metadata = data.get("metadata", {})
+    def _create_zone(self, data: dict[str, Any]) -> Zone:
+        metadata: dict[str, Any] = data.get("metadata", {})
 
         return Zone(
             name=data["name"],
             color=metadata.get("color", "white"),
             zone_type=metadata.get("zone", "normal"),
             max_drones=metadata.get("max_drones"),
-            x=data["coordinate"][0],
-            y=data["coordinate"][1],
+            x=data["x"],
+            y=data["y"],
         )
 
-    def load_zones(self, config: dict) -> None:
-        self.start_zone = self._create_zone(config["start_hub"])
-        self.end_zone = self._create_zone(config["end_hub"])
+    def load_zones(
+        self,
+        start_hub: dict[str, Any],
+        end_hub: dict[str, Any],
+        hubs: list[dict[str, Any]],
+    ) -> None:
+        self.start_zone = self._create_zone(start_hub)
+        self.end_zone = self._create_zone(end_hub)
 
         for zone in (self.start_zone, self.end_zone):
             self.add_zone(zone)
 
-        for hub in config.get("hub", []):
+        for hub in hubs:
             self.add_zone(self._create_zone(hub))
 
-    def load_connections(self, config: dict) -> None:
-        for source, target, metadata in config["connection"]:
+    def load_connections(
+        self,
+        connections: list[dict[str, Any]],
+    ) -> None:
+        for connection in connections:
             self.add_connection(
-                source,
-                target,
-                metadata.get("max_link_capacity")
+                connection["source"],
+                connection["target"],
+                connection.get("metadata", {}).get("max_link_capacity"),
                 )
 
     def get_neighbors(self, zone_name: str) -> list[Connection]:

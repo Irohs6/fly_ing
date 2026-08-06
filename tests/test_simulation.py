@@ -16,15 +16,50 @@ def _build_graph(
     nb_drones: int = 1,
 ) -> Graph:
     g = Graph()
-    config = {
-        "nb_drones": nb_drones,
-        "start_hub": {"name": "start", "coordinate": (0, 0), "metadata": {}},
-        "end_hub": {"name": "end", "coordinate": (4, 0), "metadata": {}},
-        "hub": hubs or [],
-        "connection": connections or [("start", "end", {})],
-    }
-    g.load_zones(config)
-    g.load_connections(config)
+    hub_items = []
+    for hub in hubs or []:
+        coord = hub.get("coordinate", (hub.get("x", 0), hub.get("y", 0)))
+        hub_items.append(
+            {
+                "line": 0,
+                "name": hub["name"],
+                "x": coord[0],
+                "y": coord[1],
+                "zone_type": "hub",
+                "metadata": hub.get("metadata", {}),
+            }
+        )
+
+    connection_items = [
+        {
+            "line": 0,
+            "source": source,
+            "target": target,
+            "metadata": metadata,
+        }
+        for source, target, metadata in (connections or [("start", "end", {})])
+    ]
+
+    g.load_zones(
+        {
+            "line": 1,
+            "name": "start",
+            "x": 0,
+            "y": 0,
+            "zone_type": "start",
+            "metadata": {"max_drones": nb_drones},
+        },
+        {
+            "line": 2,
+            "name": "end",
+            "x": 4,
+            "y": 0,
+            "zone_type": "end",
+            "metadata": {"max_drones": nb_drones},
+        },
+        {"hub": hub_items},
+    )
+    g.load_connections({"connection": connection_items})
     return g
 
 
@@ -122,23 +157,37 @@ class TestSimulationCompletion:
     def test_multiple_drones_on_high_capacity_path(self, capsys) -> None:
         """With high link+zone capacity, all drones finish quickly."""
         g = Graph()
-        config = {
-            "nb_drones": 4,
-            "start_hub": {
+        g.load_zones(
+            {
+                "line": 1,
                 "name": "start",
-                "coordinate": (0, 0),
+                "x": 0,
+                "y": 0,
+                "zone_type": "start",
                 "metadata": {"max_drones": 4},
             },
-            "end_hub": {
+            {
+                "line": 2,
                 "name": "end",
-                "coordinate": (1, 0),
+                "x": 1,
+                "y": 0,
+                "zone_type": "end",
                 "metadata": {"max_drones": 4},
             },
-            "hub": [],
-            "connection": [("start", "end", {"max_link_capacity": 4})],
-        }
-        g.load_zones(config)
-        g.load_connections(config)
+            {"hub": []},
+        )
+        g.load_connections(
+            {
+                "connection": [
+                    {
+                        "line": 3,
+                        "source": "start",
+                        "target": "end",
+                        "metadata": {"max_link_capacity": 4},
+                    }
+                ]
+            }
+        )
         sim = Simulation(g, debug=False)
         sim.load_drones(4)
         sim.simulate()
@@ -236,10 +285,10 @@ class TestSimulationRealMaps:
     def _run_map(self, path: str, nb_drones: int, capsys) -> int:
         from src.parser.parser import Parser
 
-        config = Parser(path).parse()
+        _, start_hub, end_hub, hubs, connections = Parser(path).parse()
         g = Graph()
-        g.load_zones(config)
-        g.load_connections(config)
+        g.load_zones(start_hub, end_hub, hubs)
+        g.load_connections(connections)
         sim = Simulation(g, debug=False)
         sim.load_drones(nb_drones)
         sim.simulate()

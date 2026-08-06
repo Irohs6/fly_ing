@@ -16,6 +16,7 @@ class Parser:
     # --- Lecture du fichier ---
     def read(self) -> None:
         """Lit le fichier Fly-in, supprime les commentaires et lignes vides."""
+        self.lines = []
         try:
             with open(self.file_path, "r", encoding="utf-8") as f:
                 for i, raw in enumerate(f, start=1):
@@ -24,17 +25,17 @@ class Parser:
                         continue
                     self.lines.append((i, line))
         except FileNotFoundError:
-            raise ParseError(f"Fichier introuvable : {self.file_path}")
+            raise FileNotFoundError(f"Fichier introuvable : {self.file_path}")
 
     # --- Parsing des métadonnées ---
     def parse_metadata(self, raw: str) -> dict[str, str | int]:
-        meta = {}
+        meta: dict[str, str | int] = {}
         if "[" not in raw:
             return meta
         raw = raw.strip("[]")
         for token in raw.split():
             if "=" not in token:
-                continue
+                raise ParseError(f"Metadonnée invalide: {token!r} (attendu key=value)")
             key, value = token.split("=", 1)
             meta[key] = int(value) if value.isdigit() else value
         return meta
@@ -44,14 +45,15 @@ class Parser:
         try:
             parts = re.split(r"\s+", line.split(":", 1)[1].strip())
             name, x, y = parts[:3]
+
+            if "-" in name or " " in name:
+                raise ParseError(f"Nom de zone invalide: {name!r}")
+
             metadata = self.parse_metadata(" ".join(parts[3:]))
 
             # Capacité par défaut
             if "max_drones" not in metadata:
-                if metadata.get("zone") == "restricted":
-                    metadata["max_drones"] = 0
-                else:
-                    metadata["max_drones"] = 1
+                metadata["max_drones"] = 1
 
             # Start et End illimités
             if zone_type in ("start", "end"):
@@ -64,6 +66,8 @@ class Parser:
                 "zone_type": zone_type,
                 "metadata": metadata,
             }
+        except ParseError:
+            raise
         except Exception:
             raise ParseError(f"Syntaxe invalide pour la zone : {line}")
 
@@ -75,10 +79,14 @@ class Parser:
             zones = parts[0].strip().split("-")
             if len(zones) != 2:
                 raise ParseError(f"Connexion invalide : {line}")
-            metadata = self.parse_metadata(parts[1]) if len(parts) > 1 else {}
+            if not zones[0] or not zones[1]:
+                raise ParseError(f"Connexion invalide : {line}")
+            metadata = self.parse_metadata("[" + parts[1]) if len(parts) > 1 else {}
             if "max_link_capacity" not in metadata:
                 metadata["max_link_capacity"] = 1
             return {"source": zones[0], "target": zones[1], "metadata": metadata}
+        except ParseError:
+            raise
         except Exception:
             raise ParseError(f"Syntaxe invalide pour la connexion : {line}")
 
@@ -91,12 +99,23 @@ class Parser:
         hubs = []
         connections = []
 
+        first_line = self.lines[0][1] if self.lines else None
+        if first_line is None or not first_line.startswith("nb_drones:"):
+            raise ParseError("La première ligne utile doit être 'nb_drones: <int>'.")
+
         for i, line in self.lines:
             if line.startswith("nb_drones:"):
-                nb_drones = {"line": i, "value": int(line.split(":")[1].strip())}
+                raw = line.split(":", 1)[1].strip()
+                if not raw.isdigit() or int(raw) <= 0:
+                    raise ParseError(f"Ligne {i}: nb_drones invalide: {raw!r}")
+                nb_drones = {"line": i, "value": int(raw)}
             elif line.startswith("start_hub:"):
+                if start_hub:
+                    raise ParseError(f"Ligne {i}: start_hub dupliqué")
                 start_hub = {"line": i, **self.parse_zone(line, "start")}
             elif line.startswith("end_hub:"):
+                if end_hub:
+                    raise ParseError(f"Ligne {i}: end_hub dupliqué")
                 end_hub = {"line": i, **self.parse_zone(line, "end")}
             elif line.startswith("hub:"):
                 hubs.append({"line": i, **self.parse_zone(line, "hub")})
@@ -108,17 +127,21 @@ class Parser:
         if not start_hub or not end_hub:
             raise ParseError("start_hub ou end_hub manquant dans le fichier.")
 
-        return nb_drones, start_hub, end_hub, {"hub": hubs}, {"connection": connections}
+        # Start and end hubs must accommodate all drones for simulation startup.
+        start_hub.setdefault("metadata", {})["max_drones"] = nb_drones["value"]
+        end_hub.setdefault("metadata", {})["max_drones"] = nb_drones["value"]
+
+        from .validator import MapValidator
+
+        validator = MapValidator(nb_drones, start_hub, end_hub, hubs, connections)
+        validator.validate()
+
+        return nb_drones, start_hub, end_hub, hubs, connections
 
 
 if __name__ == "__main__":
     parser = Parser("assets/maps/challenger/01_the_impossible_dream.txt")
     nb_drones, start, end, hubs, conns = parser.parse()
-    
-     # Validation
-    from .validator import MapValidator
-    validator = MapValidator(nb_drones, start, end, hubs, conns)
-    validator.validate()
 
     print("\n=== 🛰️  Configuration de la carte Fly-in ===\n")
     print(f"Nombre de drones : {nb_drones['value']} (ligne {nb_drones['line']})\n")
@@ -136,14 +159,14 @@ if __name__ == "__main__":
     print()
 
     print("🏗️  Zones intermédiaires (hubs) :")
-    for hub in hubs["hub"]:
-        print(f"  [{hub['line']}] {hub['name']}  ({hub['x']}, {hub['y']})  type={hub['zone_type']}")
+    for hub in hubs:
+        print(f"  [{hub['line']}] {hub['name']}  ({hub['x']}, {hub['y']})")
         for k, v in hub["metadata"].items():
             print(f"    {k}: {v}")
         print()
 
     print("🔗 Connexions :")
-    for conn in conns["connection"]:
+    for conn in conns:
         print(f"  [{conn['line']}] {conn['source']} -> {conn['target']}")
         for k, v in conn["metadata"].items():
             print(f"    {k}: {v}")

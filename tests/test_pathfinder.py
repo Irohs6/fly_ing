@@ -17,15 +17,50 @@ def _build_graph(
     end: tuple = (10, 0),
 ) -> Graph:
     g = Graph()
-    config = {
-        "nb_drones": 1,
-        "start_hub": {"name": "start", "coordinate": start, "metadata": {}},
-        "end_hub": {"name": "end", "coordinate": end, "metadata": {}},
-        "hub": hubs or [],
-        "connection": connections or [],
-    }
-    g.load_zones(config)
-    g.load_connections(config)
+    hub_items = []
+    for hub in hubs or []:
+        coord = hub.get("coordinate", (hub.get("x", 0), hub.get("y", 0)))
+        hub_items.append(
+            {
+                "line": 0,
+                "name": hub["name"],
+                "x": coord[0],
+                "y": coord[1],
+                "zone_type": "hub",
+                "metadata": hub.get("metadata", {}),
+            }
+        )
+
+    connection_items = [
+        {
+            "line": 0,
+            "source": source,
+            "target": target,
+            "metadata": metadata,
+        }
+        for source, target, metadata in (connections or [])
+    ]
+
+    g.load_zones(
+        {
+            "line": 1,
+            "name": "start",
+            "x": start[0],
+            "y": start[1],
+            "zone_type": "start",
+            "metadata": {},
+        },
+        {
+            "line": 2,
+            "name": "end",
+            "x": end[0],
+            "y": end[1],
+            "zone_type": "end",
+            "metadata": {},
+        },
+        {"hub": hub_items},
+    )
+    g.load_connections({"connection": connection_items})
     return g
 
 
